@@ -1,0 +1,57 @@
+#include <vector>
+
+#ifndef NN_NEURALNET
+#define NN_NEURALNET
+
+using namespace std;
+
+struct shape
+{
+  int n;
+  int* sizes;
+  //shape(int x)
+  //{
+  //  n = x;
+  //  sizes = new int[n];
+  //}
+  ~shape()
+  {
+    delete[] sizes;
+  }
+};
+
+class Neuralnet
+{
+public:
+//private:
+// activation function and its derivative
+  float g(float z);
+  void  g(float* A, float* Z, int n);
+  float g_prime(float z);
+  void  g_prime(float* A, float* Z, int n);
+// gradient of the output loss
+  float gradC(float a, float y);
+  void  gradC(float* D, float* A, float* Y, int n);
+// forward and back propagation
+  void forward_prop(float* X);
+  void back_prop(float* X, float* y);
+  void update_weights(float eta);
+//public:
+  shape s;
+  int n_layers;
+  float** b;
+  float** db;
+  float*** W;
+  float*** dW;
+  float** z;
+  float** a;
+  float** d;
+
+  Neuralnet(struct shape* S);
+  ~Neuralnet();
+  void eval(float* X, float* y);
+  void train(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float eta=0.25);
+  float loss(vector<float*> X_train, vector<float*> y_train);
+};
+
+#endif
