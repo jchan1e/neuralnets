@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <random>
 #include <chrono>
-//#include <iostream>
+#include <iostream>
 
 Neuralnet::Neuralnet(struct shape* S)
 {
@@ -85,7 +85,7 @@ Neuralnet::~Neuralnet()
 
 float Neuralnet::g(float z)
 {
-  return 1.0/(1.0 + exp(z));
+  return 1.0/(1.0 + exp(-z));
 }
 void Neuralnet::g(float* A, float* Z, int n)
 { // Activation function
@@ -128,6 +128,7 @@ void Neuralnet::forward_prop(float* X)
 //#pragma omp for
     for (int j=0; j < s.sizes[l]; ++j)
     {
+      z[l][j] = 0.0;
       for (int i=0; i < s.sizes[l-1]; ++i)
       {
         z[l][j] += a[l-1][i] * W[l-1][i][j];
@@ -206,40 +207,60 @@ void Neuralnet::update_weights(float eta)
 
 void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_epochs, float eta)
 {
-  vector<int> index;
-  for (unsigned int i=0; i < X_train.size(); ++i)
-    index.push_back(i);
-  random_shuffle(index.begin(), index.end());
+  int interval = 10;
+  if (num_epochs > 200)
+    interval = 20;
+  if (num_epochs > 1000)
+    interval = 50;
 
-  for (int e=0; e < num_epochs; ++e)
+  cout << "epoch: " << 0 << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+  //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
+
+  for (int e=1; e <= num_epochs; ++e)
   {
+    vector<int> index;
+    for (unsigned int i=0; i < X_train.size(); ++i)
+      index.push_back(i);
+    random_shuffle(index.begin(), index.end());
 //#pragma omp parallel for
-    for (unsigned int j=0; j < index.size(); ++j)
+    //for (unsigned int j=0; j < index.size(); ++j)
+    for (int i : index)
     {
-      int i = index[j];
+      //int i = index[j];
       back_prop(X_train[i], y_train[i]);
 //#pragma omp critical
 //      {
       update_weights(eta);
 //      }
     }
+    if (e%(interval) == 0 || e == num_epochs)
+    {
+      cout << "epoch: " << e << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+      //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
+    }
   }
 }
 
 float Neuralnet::loss(vector<float*> X_train, vector<float*> y_train)
 {
-  vector<int> index;
+  //vector<int> index;
+  //for (unsigned int i=0; i < X_train.size(); ++i)
+  //  index.push_back(i);
+  //random_shuffle(index.begin(), index.end());
+
+  float L= 0.0;
+
+  //for (int i : index)
   for (unsigned int i=0; i < X_train.size(); ++i)
-    index.push_back(i);
-  random_shuffle(index.begin(), index.end());
-
-  float loss = 0.0;
-
-  for (int i : index)
   {
     forward_prop(X_train[i]);
     for (int j=0; j < s.sizes[s.n-1]; ++j)
-      loss += (a[s.n-1][j] - y_train[i][j]) * (a[s.n-1][j] - y_train[i][j]);
+    {
+      float diff = a[s.n-1][j] - y_train[i][j];
+      if (0.5 * diff * diff < 0)
+        cout << "wtf" << endl;
+      L += 0.5 * diff * diff;
+    }
   }
-  return 0.5*loss;
+  return L;
 }
