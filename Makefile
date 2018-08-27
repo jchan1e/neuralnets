@@ -22,6 +22,9 @@ neuralnet.o: neuralnet.cpp neuralnet.h
 test: test.o
 	./test.o
 
+testp: test.o
+	./test.o "p"
+
 test.o: test.cpp neuralnet.o
 	g++ $(CFLAGS) -o $@ $^ -fopenmp
 

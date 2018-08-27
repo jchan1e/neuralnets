@@ -7,16 +7,14 @@
 using namespace std;
 
 
-int main()
+int main(int argc, char** argv)
 {
   struct shape S;
-  S.n = 5;
+  S.n = 3;
   S.sizes = new int[S.n];
   S.sizes[0] = 2;
-  S.sizes[1] = 15;
-  S.sizes[2] = 15;
-  S.sizes[3] = 15;
-  S.sizes[4] = 2;
+  S.sizes[1] = 5;
+  S.sizes[2] = 2;
 
   Neuralnet N(&S);
 
@@ -45,19 +43,22 @@ int main()
   }
   //for (float* x : X_t)
   //  cout << x << " " << x[0] << endl;
-  N.train(X_t, y_t, 4000, 0.25);
+  if (argc > 1)
+    N.train_parallel(X_t, y_t, 50, 0.25);
+  else
+    N.train(X_t, y_t, 50, 0.25);
   //cout << "backprop test\n";
-  for (int l=1; l < S.n; ++l) {
-    //cout << "[\n";
-    for (int i=0; i < S.sizes[l-1]; ++i) {
-      //cout << "[ ";
-      for (int j=0; j < S.sizes[l]; ++j) {
-        //cout << N.W[l-1][i][j] << " ";
-      }
-      //cout << "]\n";
-    }
-    //cout << "]\n";
-  }
+  //for (int l=1; l < S.n; ++l) {
+  //  cout << "[\n";
+  //  for (int i=0; i < S.sizes[l-1]; ++i) {
+  //    cout << "[ ";
+  //    for (int j=0; j < S.sizes[l]; ++j) {
+  //      cout << N.W[l-1][i][j] << " ";
+  //    }
+  //    cout << "]\n";
+  //  }
+  //  cout << "]\n";
+  //}
 
   for (unsigned int i=0; i < X_t.size(); ++i) {
     delete X_t[i];
