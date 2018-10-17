@@ -49,6 +49,72 @@ Neuralnet::Neuralnet(struct shape* S)
   }
 }
 
+Neuralnet::Neuralnet(char* filename)
+{
+  ifstream f;
+  f.open(filename, ios::in | ios::binary);
+
+  f.read((char*)&s.n, sizeof(int));
+
+  s.sizes = new int[s.n];
+  f.read((char*)s.sizes, s.n*sizeof(int));;
+
+  cout << s.n << endl;
+  for (int i=0; i < s.n; ++i)
+    cout << s.sizes[i] << endl;
+
+  n_layers = s.n;
+  z  = new float*[s.n];
+  a  = new float*[s.n];
+  d  = new float*[s.n];
+  b  = new float*[s.n-1];
+  db = new float*[s.n-1];
+  W  = new float**[s.n-1];
+  dW = new float**[s.n-1];
+  for (int i=0; i < s.n; ++i)
+  {
+    z[i] = new float[s.sizes[i]];
+    a[i] = new float[s.sizes[i]];
+    d[i] = new float[s.sizes[i]];
+    if (i > 0)
+    {
+      b[i-1] = new float[s.sizes[i]];
+      db[i-1] = new float[s.sizes[i]];
+      cout << i << "\tb: " << s.sizes[i] << endl;
+      f.read((char*)b[i-1], s.sizes[i]*sizeof(float));
+      W[i-1] = new float*[s.sizes[i-1]];
+      dW[i-1] = new float*[s.sizes[i-1]];
+      
+      for (int j=0; j < s.sizes[i-1]; ++j)
+      {
+        W[i-1][j] = new float[s.sizes[i]];
+        dW[i-1][j] = new float[s.sizes[i]];
+        cout << i << "\tW[" << j << "] " << s.sizes[i] << endl;
+        f.read((char*)W[i-1][j], s.sizes[i]*sizeof(float));
+      }
+    }
+  }
+}
+
+bool Neuralnet::save(char* filename)
+{
+  ofstream f;
+  f.open(filename, ios::binary);
+  if (!f)
+    return false;
+  f.write((char*)&s.n, sizeof(int));
+  f.write((char*)s.sizes, s.n*sizeof(int));
+  for (int l=1; l < s.n; ++l)
+  {
+    f.write((char*)b[l-1], s.sizes[l]*sizeof(float));
+    for (int i=0; i < s.sizes[l-1]; ++i)
+    {
+      f.write((char*)W[l-1][i], s.sizes[l]*sizeof(float));
+    }
+  }
+  return true;
+}
+
 Neuralnet::~Neuralnet()
 {
   //cout << "Deleting N\n";
@@ -172,12 +238,9 @@ void Neuralnet::back_prop(float* X, float* y)
   forward_prop(X);
   gradC(d[s.n-1], a[s.n-1], y, s.sizes[s.n-1]);
 
-//#pragma omp parallel num_threads(6)
-//{
   for (int l=s.n-2; l >= 0; --l)
   {
     //dW[l] = outer(d[l+1], a[l]);
-//#pragma omp for collapse(2)
     for (int i=0; i < s.sizes[l]; ++i)
     {
       for (int j=0; j < s.sizes[l+1]; ++j)
@@ -187,16 +250,12 @@ void Neuralnet::back_prop(float* X, float* y)
     }
 
     //db[l] = d[l+1];
-//#pragma omp single
-//{
     for (int i=0; i < s.sizes[l+1]; ++i)
     {
       db[l][i] = d[l+1][i];
     }
-//}
 
     //d[l]  = inner(W[l], d[l+1]) * g_prime(z[l]);
-//#pragma omp for
     for (int i=0; i < s.sizes[l]; ++i)
     {
       d[l][i] = 0.0;
@@ -206,9 +265,7 @@ void Neuralnet::back_prop(float* X, float* y)
       }
       d[l][i] *= g_prime(z[l][i]);
     }
-//#pragma omp barrier
   }
-//}
 }
 
 void Neuralnet::back_prop(float* X, float* y, float** lz, float** la, float** ld, float** lb, float** ldb, float*** lW, float*** ldW)
@@ -274,7 +331,7 @@ void Neuralnet::update_weights(float eta)
     for (int i=0; i < s.sizes[l+1]; ++i)
     {
       b[l][i] -= eta*db[l][i];
-      cout << b[l][i] << "   \t" << db[l][i] << endl;
+      //cout << b[l][i] << "   \t" << db[l][i] << endl;
     }
   }
 }
@@ -343,6 +400,38 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
     if (e%(interval) == 0 || e == num_epochs)
     {
       cout << "epoch: " << e << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+      //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
+    }
+  }
+}
+
+void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs, float eta)
+{
+  int interval = 10;
+  if (num_epochs >= 200)
+    interval = 20;
+  if (num_epochs >= 1000)
+    interval = 50;
+
+  cout << "epoch: " << 0 << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
+  //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
+
+  for (int e=1; e <= num_epochs; ++e)
+  {
+    vector<int> index;
+    for (unsigned int i=0; i < X_train.size(); ++i)
+      index.push_back(i);
+    random_shuffle(index.begin(), index.end());
+
+    for (int i : index)
+    {
+      back_prop(X_train[i], y_train[i]);
+      update_weights(eta);
+    }
+
+    if (e%(interval) == 0 || e == num_epochs)
+    {
+      cout << "epoch: " << e << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }

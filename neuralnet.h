@@ -1,4 +1,5 @@
 #include <vector>
+#include <fstream>
 
 #ifndef NN_NEURALNET
 #define NN_NEURALNET
@@ -22,8 +23,8 @@ struct shape
 
 class Neuralnet
 {
-public:
-//private:
+//public:
+private:
 // activation function and its derivative
   float g(float z);
   void  g(float* A, float* Z, int n);
@@ -40,7 +41,7 @@ public:
   void update_weights(float eta);
   void update_weights(float eta, float** lb, float** ldb, float*** lW, float*** ldw);
   void update_weights(float** lb, float** ldb, float*** lW, float*** ldW);
-//public:
+public:
   shape s;
   int n_layers;
   float** b;
@@ -59,6 +60,8 @@ public:
   void train_parallel(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float eta=0.25);
   void train_parallel(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs=10, float eta=0.25);
   float loss(vector<float*> X_train, vector<float*> y_train);
+  bool save(char* filename);
+  Neuralnet(char* filename);
 };
 
 #endif
