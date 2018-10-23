@@ -38,8 +38,8 @@ private:
   void forward_prop(float* X, float** lz, float** la, float** lb, float*** lW);
   void back_prop(float* X, float* y);
   void back_prop(float* X, float* y, float** lz, float** la, float** ld, float** lb, float** ldb, float*** lW, float*** ldw);
-  void update_weights(float eta);
-  void update_weights(float eta, float** lb, float** ldb, float*** lW, float*** ldw);
+  void update_weights(float alpha);
+  void update_weights(float alpha, float** lb, float** ldb, float*** lW, float*** ldw);
   void update_weights(float** lb, float** ldb, float*** lW, float*** ldW);
 public:
   shape s;
@@ -55,10 +55,10 @@ public:
   Neuralnet(struct shape* S);
   ~Neuralnet();
   void eval(float* X, float* y);
-  void train(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float eta=0.25);
-  void train(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs=10, float eta=0.25);
-  void train_parallel(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float eta=0.25);
-  void train_parallel(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs=10, float eta=0.25);
+  void train(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float alpha=0.25, float decay=0.0);
+  void train(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs=10, float alpha=0.25, float decay=0.0);
+  void train_parallel(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float alpha=0.25);
+  void train_parallel(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs=10, float alpha=0.25);
   float loss(vector<float*> X_train, vector<float*> y_train);
   bool save(char* filename);
   Neuralnet(char* filename);

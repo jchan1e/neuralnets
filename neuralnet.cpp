@@ -59,9 +59,9 @@ Neuralnet::Neuralnet(char* filename)
   s.sizes = new int[s.n];
   f.read((char*)s.sizes, s.n*sizeof(int));;
 
-  cout << s.n << endl;
-  for (int i=0; i < s.n; ++i)
-    cout << s.sizes[i] << endl;
+  //cout << s.n << endl;
+  //for (int i=0; i < s.n; ++i)
+  //  cout << s.sizes[i] << endl;
 
   n_layers = s.n;
   z  = new float*[s.n];
@@ -80,7 +80,7 @@ Neuralnet::Neuralnet(char* filename)
     {
       b[i-1] = new float[s.sizes[i]];
       db[i-1] = new float[s.sizes[i]];
-      cout << i << "\tb: " << s.sizes[i] << endl;
+      //cout << i << "\tb: " << s.sizes[i] << endl;
       f.read((char*)b[i-1], s.sizes[i]*sizeof(float));
       W[i-1] = new float*[s.sizes[i-1]];
       dW[i-1] = new float*[s.sizes[i-1]];
@@ -89,7 +89,7 @@ Neuralnet::Neuralnet(char* filename)
       {
         W[i-1][j] = new float[s.sizes[i]];
         dW[i-1][j] = new float[s.sizes[i]];
-        cout << i << "\tW[" << j << "] " << s.sizes[i] << endl;
+        //cout << i << "\tW[" << j << "] " << s.sizes[i] << endl;
         f.read((char*)W[i-1][j], s.sizes[i]*sizeof(float));
       }
     }
@@ -319,34 +319,34 @@ void Neuralnet::eval(float* X, float* y)
     y[i] = a[s.n-1][i];
 }
 
-void Neuralnet::update_weights(float eta)
+void Neuralnet::update_weights(float alpha)
 {
   for (int l=0; l < s.n-1; ++l)
   {
     for (int i=0; i < s.sizes[l]; ++i)
     {
       for (int j=0; j < s.sizes[l+1]; ++j)
-        W[l][i][j] -= eta*dW[l][i][j];
+        W[l][i][j] -= alpha*dW[l][i][j];
     }
     for (int i=0; i < s.sizes[l+1]; ++i)
     {
-      b[l][i] -= eta*db[l][i];
+      b[l][i] -= alpha*db[l][i];
       //cout << b[l][i] << "   \t" << db[l][i] << endl;
     }
   }
 }
 
-void Neuralnet::update_weights(float eta, float** lb, float** ldb, float*** lW, float*** ldW)
+void Neuralnet::update_weights(float alpha, float** lb, float** ldb, float*** lW, float*** ldW)
 {
   for (int l=0; l < s.n-1; ++l)
   {
     for (int i=0; i < s.sizes[l]; ++i)
     {
       for (int j=0; j < s.sizes[l+1]; ++j)
-        lW[l][i][j] -= eta*ldW[l][i][j];
+        lW[l][i][j] -= alpha*ldW[l][i][j];
     }
     for (int i=0; i < s.sizes[l+1]; ++i)
-      lb[l][i] -= eta*ldb[l][i];
+      lb[l][i] -= alpha*ldb[l][i];
   }
 }
 
@@ -373,7 +373,7 @@ void Neuralnet::update_weights(float** lb, float** ldb, float*** lW, float*** ld
   }
 }
 
-void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_epochs, float eta)
+void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_epochs, float alpha, float decay)
 {
   int interval = 10;
   if (num_epochs >= 200)
@@ -381,11 +381,15 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
   if (num_epochs >= 1000)
     interval = 50;
 
-  cout << "epoch: " << 0 << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+  cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
+  float a = alpha;
   for (int e=1; e <= num_epochs; ++e)
   {
+    if (decay > 0.0)
+      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+    //cout << "alpha: " << a << endl;
     vector<int> index;
     for (unsigned int i=0; i < X_train.size(); ++i)
       index.push_back(i);
@@ -394,18 +398,18 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(eta);
+      update_weights(a);
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha; " << a << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }
 }
 
-void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs, float eta)
+void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs, float alpha, float decay)
 {
   int interval = 10;
   if (num_epochs >= 200)
@@ -413,9 +417,10 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
   if (num_epochs >= 1000)
     interval = 50;
 
-  cout << "epoch: " << 0 << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
+  cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
+  float a = alpha;
   for (int e=1; e <= num_epochs; ++e)
   {
     vector<int> index;
@@ -423,21 +428,24 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
       index.push_back(i);
     random_shuffle(index.begin(), index.end());
 
+    if (decay > 0.0)
+      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+    //cout << "alpha: " << a << endl;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(eta);
+      update_weights(a);
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }
 }
 
-void Neuralnet::train_parallel(vector<float*> X_train, vector<float*> y_train, int num_epochs, float eta)
+void Neuralnet::train_parallel(vector<float*> X_train, vector<float*> y_train, int num_epochs, float alpha)
 {
   int interval = 10;
   if (num_epochs >= 200)
@@ -445,7 +453,7 @@ void Neuralnet::train_parallel(vector<float*> X_train, vector<float*> y_train, i
   if (num_epochs >= 1000)
     interval = 50;
 
-  cout << "epoch: 0\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+  cout << "epoch: " << 0 << "\talpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
   for (int e=1; e <= num_epochs; ++e)
@@ -511,7 +519,7 @@ void Neuralnet::train_parallel(vector<float*> X_train, vector<float*> y_train, i
     {
       int i = index[j];
       back_prop(X_train[i], y_train[i], lz, la, ld, lb, ldb, lW, ldW);
-      update_weights(eta, lb, ldb, lW, ldW);
+      update_weights(alpha, lb, ldb, lW, ldW);
     }
 
 #pragma omp critical

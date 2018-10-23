@@ -12,7 +12,7 @@ int main(int argc, char** argv)
   struct shape S;
   S.n = 5;
   S.sizes = new int[S.n];
-  S.sizes[0] = 2;
+  S.sizes[0] = 4;
   S.sizes[1] = 30;
   S.sizes[2] = 80;
   S.sizes[3] = 30;
@@ -27,20 +27,28 @@ int main(int argc, char** argv)
   vector<float*> y_v;
   double M = 0.0;
   double m = 1.0;
-  for (int i=0; i < 720*2; ++i) {
-    float* X = new float[2];
+  for (int i=0; i < 16384*2; ++i) {
+    float* X = new float[4];
     float* y = new float[2];
     X[0] = (double)rand()/RAND_MAX*2.0 - 1.0;
     X[1] = (double)rand()/RAND_MAX*2.0 - 1.0;
+    X[2] = (double)rand()/RAND_MAX*2.0 - 1.0;
+    X[3] = (double)rand()/RAND_MAX*2.0 - 1.0;
     double fm0 = fmod(X[0], 0.25);
     double fm1 = fmod(X[1], 0.25);
-    if      ((0 < fm0 && fm0 < 0.01) || fm0 < -0.24) X[0] = X[0] + 0.01;
-    else if ((0 > fm0 && fm0 > -0.01) || fm0 > 0.24) X[0] = X[0] - 0.01;
-    if      ((0 < fm1 && fm1 < 0.01) || fm1 < -0.24) X[1] = X[1] + 0.01;
-    else if ((0 > fm1 && fm1 > -0.01) || fm1 > 0.24) X[1] = X[1] - 0.01;
+    double fm2 = fmod(X[2], 0.25);
+    double fm3 = fmod(X[3], 0.25);
+    if      ((0 < fm0 && fm0 <  0.02) || fm0 < -0.23) X[0] = X[0] + 0.02;
+    else if ((0 > fm0 && fm0 > -0.02) || fm0 >  0.23) X[0] = X[0] - 0.02;
+    if      ((0 < fm1 && fm1 <  0.02) || fm1 < -0.23) X[1] = X[1] + 0.02;
+    else if ((0 > fm1 && fm1 > -0.02) || fm1 >  0.23) X[1] = X[1] - 0.02;
+    if      ((0 < fm2 && fm2 <  0.02) || fm2 < -0.23) X[2] = X[2] + 0.02;
+    else if ((0 > fm2 && fm2 > -0.02) || fm2 >  0.23) X[2] = X[2] - 0.02;
+    if      ((0 < fm3 && fm3 <  0.02) || fm3 < -0.23) X[3] = X[3] + 0.02;
+    else if ((0 > fm3 && fm3 > -0.02) || fm3 >  0.23) X[3] = X[3] - 0.02;
     M = max(M, fmod(abs(X[0]), 0.25));
     m = min(m, fmod(abs(X[0]), 0.25));
-    if ((int)(X[0]*2)%2 == (int)(X[1]*2)%2) {
+    if (((int)(X[0]*1.5)%2 + (int)(X[1]*1.5)%2 + (int)(X[2]*1.5)%2 + (int)(X[3]*1.5)%2)%2 == 0) {
       y[0] = 0.0;
       y[1] = 1.0;
     }
@@ -48,7 +56,7 @@ int main(int argc, char** argv)
       y[0] = 1.0;
       y[1] = 0.0;
     }
-    if (i < 720) {
+    if (i < 16384) {
       X_t.push_back(X);
       y_t.push_back(y);
     }
@@ -57,14 +65,14 @@ int main(int argc, char** argv)
       y_v.push_back(y);
     }
   }
-  cout << X_v.size()/sizeof(float*) << endl;
+  //cout << X_v.size() << endl;
   //cout << "min: " << m << "\tmax: " << M << endl;
   //for (float* x : X_t)
   //  cout << x << " " << x[0] << endl;
   if (argc > 1)
     N.train_parallel(X_t, y_t, 400, 0.25);
   else
-    N.train(X_t, y_t, X_v, y_v, 400, 0.25);
+    N.train(X_t, y_t, X_v, y_v, 2000, 0.25, 0.05);
   //cout << "backprop test\n";
   //for (int l=1; l < S.n; ++l) {
   //  cout << "[\n";
@@ -78,17 +86,17 @@ int main(int argc, char** argv)
   //  cout << "]\n";
   //}
 
-  float value1 = N.W[0][0][0];
+  //float value1 = N.W[0][0][0];
 
-  N.save((char*)"testfile.nn");
-  Neuralnet NN = Neuralnet((char*)"testfile.nn");
+  //N.save((char*)"testfile.nn");
+  //Neuralnet NN = Neuralnet((char*)"testfile.nn");
 
-  float value2 = NN.W[0][0][0];
-  
-  if (value1 != value2)
-    cout << "save error\n";
-  else
-    cout << "pass\n";
+  //float value2 = NN.W[0][0][0];
+  //
+  //if (value1 != value2)
+  //  cout << "save error\n";
+  //else
+  //  cout << "pass\n";
 
   for (unsigned int i=0; i < X_t.size(); ++i) {
     delete X_t[i];
