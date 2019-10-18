@@ -445,127 +445,127 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
   }
 }
 
-void Neuralnet::train_parallel(vector<float*> X_train, vector<float*> y_train, int num_epochs, float alpha)
-{
-  int interval = 10;
-  if (num_epochs >= 200)
-    interval = 20;
-  if (num_epochs >= 1000)
-    interval = 50;
-
-  cout << "epoch: " << 0 << "\talpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
-  //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
-
-  for (int e=1; e <= num_epochs; ++e)
-  {
-    vector<int> index;
-    for (unsigned int i=0; i < X_train.size(); ++i)
-      index.push_back(i);
-    random_shuffle(index.begin(), index.end());
-
-    int num_threads;
-#pragma omp parallel shared(b, db, W, dW)
-{
-    num_threads = omp_get_num_threads();
-    //reset main db/dW
-#pragma omp single
-{
-    for (int i=1; i < s.n; ++i)
-    {
-      for (int j=0; j < s.sizes[i]; ++j)
-        db[i-1][j] = 0.0;
-      for (int j=0; j < s.sizes[i-1]; ++j)
-      {
-        for (int k=0; k < s.sizes[i]; ++k)
-          dW[i-1][j][k] = 0.0;
-      }
-    }
-}
-
-    //declare local copies of all layers
-    // yes this is probably a bit expensive
-    float**  lz  = new float*[s.n];
-    float**  la  = new float*[s.n];
-    float**  ld  = new float*[s.n];
-    float**  lb  = new float*[s.n-1];
-    float**  ldb = new float*[s.n-1];
-    float*** lW  = new float**[s.n-1];
-    float*** ldW = new float**[s.n-1];
-    lz[0] = new float[s.sizes[0]];
-    la[0] = new float[s.sizes[0]];
-    ld[0] = new float[s.sizes[0]];
-    for (int i=1; i < s.n; ++i)
-    {
-      lz[i] = new float[s.sizes[i]];
-      la[i] = new float[s.sizes[i]];
-      ld[i] = new float[s.sizes[i]];
-      lb[i-1] = new float[s.sizes[i]];
-      ldb[i-1] = new float[s.sizes[i]];
-      for (int j=0; j < s.sizes[i]; ++j)
-        lb[i-1][j] = b[i-1][j];
-      lW[i-1] = new float*[s.sizes[i-1]];
-      ldW[i-1] = new float*[s.sizes[i-1]];
-      for (int j=0; j < s.sizes[i-1]; ++j)
-      {
-        lW[i-1][j] = new float[s.sizes[i]];
-        ldW[i-1][j] = new float[s.sizes[i]];
-        for (int k=0; k < s.sizes[i]; ++k)
-          lW[i-1][j][k] = W[i-1][j][k];
-      }
-    }
-
-#pragma omp for nowait
-    for (unsigned int j=0; j < index.size(); ++j)
-    {
-      int i = index[j];
-      back_prop(X_train[i], y_train[i], lz, la, ld, lb, ldb, lW, ldW);
-      update_weights(alpha, lb, ldb, lW, ldW);
-    }
-
-#pragma omp critical
-{
-    update_weights(lb, ldb, lW, ldW);
-    //cout << "--------\n";
-}
-
-    delete lz[0];
-    delete la[0];
-    delete ld[0];
-    for (int i=1; i < s.n; ++i)
-    {
-      for (int j=0; j < s.sizes[i-1]; ++j)
-      {
-        delete lW[i-1][j];
-        delete ldW[i-1][j];
-      }
-      delete lb[i-1];
-      delete ldb[i-1];
-      delete lW[i-1];
-      delete ldW[i-1];
-      delete lz[i];
-      delete la[i];
-      delete ld[i];
-    }
-    delete lb;
-    delete ldb;
-    delete lW;
-    delete ldW;
-    delete lz;
-    delete la;
-    delete ld;
-}
-
-    cout << "========\n";
-    update_weights(1.0/sqrt(num_threads));
-    cout << "========\n";
-
-    if (e%(interval) == 0 || e == num_epochs)
-    {
-      cout << "epoch: " << e << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
-      //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
-    }
-  }
-}
+//void Neuralnet::train_parallel(vector<float*> X_train, vector<float*> y_train, int num_epochs, float alpha)
+//{
+//  int interval = 10;
+//  if (num_epochs >= 200)
+//    interval = 20;
+//  if (num_epochs >= 1000)
+//    interval = 50;
+//
+//  cout << "epoch: " << 0 << "\talpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+//  //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
+//
+//  for (int e=1; e <= num_epochs; ++e)
+//  {
+//    vector<int> index;
+//    for (unsigned int i=0; i < X_train.size(); ++i)
+//      index.push_back(i);
+//    random_shuffle(index.begin(), index.end());
+//
+//    int num_threads;
+//#pragma omp parallel shared(b, db, W, dW)
+//{
+//    num_threads = omp_get_num_threads();
+//    //reset main db/dW
+//#pragma omp single
+//{
+//    for (int i=1; i < s.n; ++i)
+//    {
+//      for (int j=0; j < s.sizes[i]; ++j)
+//        db[i-1][j] = 0.0;
+//      for (int j=0; j < s.sizes[i-1]; ++j)
+//      {
+//        for (int k=0; k < s.sizes[i]; ++k)
+//          dW[i-1][j][k] = 0.0;
+//      }
+//    }
+//}
+//
+//    //declare local copies of all layers
+//    // yes this is probably a bit expensive
+//    float**  lz  = new float*[s.n];
+//    float**  la  = new float*[s.n];
+//    float**  ld  = new float*[s.n];
+//    float**  lb  = new float*[s.n-1];
+//    float**  ldb = new float*[s.n-1];
+//    float*** lW  = new float**[s.n-1];
+//    float*** ldW = new float**[s.n-1];
+//    lz[0] = new float[s.sizes[0]];
+//    la[0] = new float[s.sizes[0]];
+//    ld[0] = new float[s.sizes[0]];
+//    for (int i=1; i < s.n; ++i)
+//    {
+//      lz[i] = new float[s.sizes[i]];
+//      la[i] = new float[s.sizes[i]];
+//      ld[i] = new float[s.sizes[i]];
+//      lb[i-1] = new float[s.sizes[i]];
+//      ldb[i-1] = new float[s.sizes[i]];
+//      for (int j=0; j < s.sizes[i]; ++j)
+//        lb[i-1][j] = b[i-1][j];
+//      lW[i-1] = new float*[s.sizes[i-1]];
+//      ldW[i-1] = new float*[s.sizes[i-1]];
+//      for (int j=0; j < s.sizes[i-1]; ++j)
+//      {
+//        lW[i-1][j] = new float[s.sizes[i]];
+//        ldW[i-1][j] = new float[s.sizes[i]];
+//        for (int k=0; k < s.sizes[i]; ++k)
+//          lW[i-1][j][k] = W[i-1][j][k];
+//      }
+//    }
+//
+//#pragma omp for nowait
+//    for (unsigned int j=0; j < index.size(); ++j)
+//    {
+//      int i = index[j];
+//      back_prop(X_train[i], y_train[i], lz, la, ld, lb, ldb, lW, ldW);
+//      update_weights(alpha, lb, ldb, lW, ldW);
+//    }
+//
+//#pragma omp critical
+//{
+//    update_weights(lb, ldb, lW, ldW);
+//    //cout << "--------\n";
+//}
+//
+//    delete lz[0];
+//    delete la[0];
+//    delete ld[0];
+//    for (int i=1; i < s.n; ++i)
+//    {
+//      for (int j=0; j < s.sizes[i-1]; ++j)
+//      {
+//        delete lW[i-1][j];
+//        delete ldW[i-1][j];
+//      }
+//      delete lb[i-1];
+//      delete ldb[i-1];
+//      delete lW[i-1];
+//      delete ldW[i-1];
+//      delete lz[i];
+//      delete la[i];
+//      delete ld[i];
+//    }
+//    delete lb;
+//    delete ldb;
+//    delete lW;
+//    delete ldW;
+//    delete lz;
+//    delete la;
+//    delete ld;
+//}
+//
+//    cout << "========\n";
+//    update_weights(1.0/sqrt(num_threads));
+//    cout << "========\n";
+//
+//    if (e%(interval) == 0 || e == num_epochs)
+//    {
+//      cout << "epoch: " << e << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+//      //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
+//    }
+//  }
+//}
 
 float Neuralnet::loss(vector<float*> X_train, vector<float*> y_train)
 {

@@ -12,7 +12,7 @@ all: neuralnet.o #mnist
 
 
 neuralnet.o: neuralnet.cpp neuralnet.h
-	g++ $(CFLAGS) -c $< -fopenmp
+	g++ $(CFLAGS) -c $< # -fopenmp
 
 
 #mnist: mnist.cpp neuralnet.o connect.o layer.o
