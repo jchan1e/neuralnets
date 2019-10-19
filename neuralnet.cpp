@@ -84,7 +84,7 @@ Neuralnet::Neuralnet(char* filename)
       f.read((char*)b[i-1], s.sizes[i]*sizeof(float));
       W[i-1] = new float*[s.sizes[i-1]];
       dW[i-1] = new float*[s.sizes[i-1]];
-      
+
       for (int j=0; j < s.sizes[i-1]; ++j)
       {
         W[i-1][j] = new float[s.sizes[i]];
