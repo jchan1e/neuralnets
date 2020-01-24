@@ -24,15 +24,15 @@ struct shape
 class Neuralnet
 {
 //public:
-typedef float (Neuralnet::*ActivFn)(float z);
+typedef float (*ActivFn)(float z);
 
 private:
 // activation functions and their derivatives
-  float sig(float z);
-  float sig_prime(float z);
-  float relu(float z);
-  float relu_prime(float z);
-  ActivFn g = &Neuralnet::sig;
+  static float sig(float z);
+  static float sig_prime(float z);
+  static float relu(float z);
+  static float relu_prime(float z);
+  ActivFn g = &sig;
   ActivFn g_prime = &Neuralnet::sig_prime;
   void  G(float* A, float* Z, int n);
   void  G_prime(float* A, float* Z, int n);

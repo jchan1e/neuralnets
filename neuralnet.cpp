@@ -154,21 +154,21 @@ float Neuralnet::sig(float z)
 {
   return 1.0/(1.0 + exp(-z));
 }
+float Neuralnet::sig_prime(float z)
+{
+  float gz = sig(z);
+  return gz * (1.0 - gz);
+}
+
 void Neuralnet::G(float* A, float* Z, int n)
 { // Activation function
   for (int i=0; i < n; ++i)
-    A[i] = (*this.*g)(Z[i]);
-}
-
-float Neuralnet::sig_prime(float z)
-{
-  float gz = (*this.*g)(z);
-  return gz * (1.0 - gz);
+    A[i] = (*g)(Z[i]);
 }
 void Neuralnet::G_prime(float* A, float* Z, int n)
 {
   for (int i=0; i < n; ++i)
-    A[i] = (*this.*g_prime)(Z[i]);
+    A[i] = (*g_prime)(Z[i]);
 }
 
 float Neuralnet::gradC(float a, float y)
@@ -178,7 +178,7 @@ float Neuralnet::gradC(float a, float y)
 void Neuralnet::gradC(float* D, float* A, float* Y, int n)
 {
   for (int i=0; i < n; ++i)
-    D[i] = gradC(A[i], Y[i]) * (*this.*g_prime)(A[i]);
+    D[i] = gradC(A[i], Y[i]) * (*g_prime)(A[i]);
 }
 
 void Neuralnet::forward_prop(float* X)
@@ -201,7 +201,7 @@ void Neuralnet::forward_prop(float* X)
         z[l][j] += a[l-1][i] * W[l-1][i][j];
       }
       z[l][j] += b[l-1][j];
-      a[l][j] = (*this.*g)(z[l][j]);
+      a[l][j] = (*g)(z[l][j]);
     }
 //#pragma omp barrier
   }
@@ -227,7 +227,7 @@ void Neuralnet::forward_prop(float* X, float** z, float** a, float** b, float***
         z[l][j] += a[l-1][i] * W[l-1][i][j];
       }
       z[l][j] += b[l-1][j];
-      a[l][j] = (*this.*g)(z[l][j]);
+      a[l][j] = (*g)(z[l][j]);
     }
 //#pragma omp barrier
   }
@@ -263,7 +263,7 @@ void Neuralnet::back_prop(float* X, float* y)
       {
         d[l][i] += d[l+1][j] * W[l][i][j];
       }
-      d[l][i] *= (*this.*g_prime)(z[l][i]);
+      d[l][i] *= (*g_prime)(z[l][i]);
     }
   }
 }
@@ -305,7 +305,7 @@ void Neuralnet::back_prop(float* X, float* y, float** lz, float** la, float** ld
       {
         ld[l][i] += ld[l+1][j] * lW[l][i][j];
       }
-      ld[l][i] *= (*this.*g_prime)(lz[l][i]);
+      ld[l][i] *= (*g_prime)(lz[l][i]);
     }
 //#pragma omp barrier
   }
