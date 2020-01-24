@@ -24,12 +24,18 @@ struct shape
 class Neuralnet
 {
 //public:
+typedef float (Neuralnet::*ActivFn)(float z);
+
 private:
-// activation function and its derivative
-  float g(float z);
-  void  g(float* A, float* Z, int n);
-  float g_prime(float z);
-  void  g_prime(float* A, float* Z, int n);
+// activation functions and their derivatives
+  float sig(float z);
+  float sig_prime(float z);
+  float relu(float z);
+  float relu_prime(float z);
+  ActivFn g = &Neuralnet::sig;
+  ActivFn g_prime = &Neuralnet::sig_prime;
+  void  G(float* A, float* Z, int n);
+  void  G_prime(float* A, float* Z, int n);
 // gradient of the output loss
   float gradC(float a, float y);
   void  gradC(float* D, float* A, float* Y, int n);
@@ -52,7 +58,7 @@ public:
   float** a;
   float** d;
 
-  Neuralnet(struct shape* S);
+  Neuralnet(struct shape* S, bool sigm=false);
   ~Neuralnet();
   void eval(float* X, float* y);
   void train(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float alpha=0.25, float decay=0.0);
