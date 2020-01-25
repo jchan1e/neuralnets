@@ -32,8 +32,8 @@ private:
   static float sig_prime(float z);
   static float relu(float z);
   static float relu_prime(float z);
-  ActivFn g = &sig;
-  ActivFn g_prime = &Neuralnet::sig_prime;
+  const ActivFn g;
+  const ActivFn g_prime;
   void  G(float* A, float* Z, int n);
   void  G_prime(float* A, float* Z, int n);
 // gradient of the output loss

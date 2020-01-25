@@ -6,7 +6,7 @@
 #include <iostream>
 #include <omp.h>
 
-Neuralnet::Neuralnet(struct shape* S, bool sigm)
+Neuralnet::Neuralnet(struct shape* S, const bool sigm) : g(sigm?&sig:&relu), g_prime(sigm?&sig_prime:&relu_prime)
 {
   unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
   default_random_engine generator(seed);
@@ -49,8 +49,11 @@ Neuralnet::Neuralnet(struct shape* S, bool sigm)
   }
 }
 
-Neuralnet::Neuralnet(char* filename)
+Neuralnet::Neuralnet(char* filename) : g(), g_prime()
 {
+  const ActivFn g(&sig);
+  const ActivFn g_prime(&sig_prime);
+
   ifstream f;
   f.open(filename, ios::in | ios::binary);
 
@@ -148,6 +151,15 @@ Neuralnet::~Neuralnet()
   delete[] db;
   delete[] W;
   delete[] dW;
+}
+
+float Neuralnet::relu(float z)
+{
+  return z>0.0?z:0.0;
+}
+float Neuralnet::relu_prime(float z)
+{
+  return z>0.0?1.0:0.0;
 }
 
 float Neuralnet::sig(float z)
