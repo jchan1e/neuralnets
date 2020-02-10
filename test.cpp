@@ -14,11 +14,12 @@ int main(int argc, char** argv)
   S.sizes = new int[S.n];
   S.sizes[0] = 4;
   S.sizes[1] = 30;
-  S.sizes[2] = 80;
+  S.sizes[2] = 30;
   S.sizes[3] = 30;
   S.sizes[4] = 2;
 
-  Neuralnet N(&S);
+  //Neuralnet N(&S, false, 0.0);
+  Neuralnet N(&S, false, 0.000001);
 
   //backprop test
   vector<float*> X_t;
@@ -27,7 +28,8 @@ int main(int argc, char** argv)
   vector<float*> y_v;
   double M = 0.0;
   double m = 1.0;
-  for (int i=0; i < 16384*2; ++i) {
+  //for (int i=0; i < 16384*2; ++i) {
+  for (int i=0; i < 2048*2; ++i) {
     float* X = new float[4];
     float* y = new float[2];
     X[0] = (double)rand()/RAND_MAX*2.0 - 1.0;
@@ -56,7 +58,8 @@ int main(int argc, char** argv)
       y[0] = 1.0;
       y[1] = 0.0;
     }
-    if (i < 16384) {
+    //if (i < 16384) {
+    if (i < 2048) {
       X_t.push_back(X);
       y_t.push_back(y);
     }
@@ -69,10 +72,9 @@ int main(int argc, char** argv)
   //cout << "min: " << m << "\tmax: " << M << endl;
   //for (float* x : X_t)
   //  cout << x << " " << x[0] << endl;
-  if (argc > 1)
-    N.train_parallel(X_t, y_t, 400, 0.25);
-  else
-    N.train(X_t, y_t, X_v, y_v, 2000, 0.25, 0.05);
+  //if (argc > 1)
+  //  N.train_parallel(X_t, y_t, 400, 0.25);
+  //else
   //cout << "backprop test\n";
   //for (int l=1; l < S.n; ++l) {
   //  cout << "[\n";
@@ -85,6 +87,19 @@ int main(int argc, char** argv)
   //  }
   //  cout << "]\n";
   //}
+  N.train(X_t, y_t, X_v, y_v, 400, 0.05, 0.005);
+  cout << "backprop test\n";
+  for (int l=1; l < S.n; ++l) {
+    cout << "[\n";
+    for (int i=0; i < S.sizes[l-1]; ++i) {
+      cout << "[ ";
+      for (int j=0; j < S.sizes[l]; ++j) {
+        cout << N.W[l-1][i][j] << " ";
+      }
+      cout << "]\n";
+    }
+    cout << "]\n";
+  }
 
   //float value1 = N.W[0][0][0];
 

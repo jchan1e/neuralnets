@@ -44,11 +44,12 @@ private:
   void forward_prop(float* X, float** lz, float** la, float** lb, float*** lW);
   void back_prop(float* X, float* y);
   void back_prop(float* X, float* y, float** lz, float** la, float** ld, float** lb, float** ldb, float*** lW, float*** ldw);
-  void update_weights(float alpha);
+  void update_weights(float alpha, float lam_len);
   void update_weights(float alpha, float** lb, float** ldb, float*** lW, float*** ldw);
   void update_weights(float** lb, float** ldb, float*** lW, float*** ldW);
 public:
   shape s;
+  float Lambda; // ratio between actual lambda and alpha
   int n_layers;
   float** b;
   float** db;
@@ -58,7 +59,7 @@ public:
   float** a;
   float** d;
 
-  Neuralnet(struct shape* S, bool sigm=false);
+  Neuralnet(struct shape* S, bool sigm=false, float lam=0.05);
   ~Neuralnet();
   void eval(float* X, float* y);
   void train(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float alpha=0.25, float decay=0.0);
