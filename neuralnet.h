@@ -9,16 +9,18 @@ using namespace std;
 struct shape
 {
   int n;
-  int* sizes;
+  int sizes[1000] = {0};
+  bool sigm;
+  float lam;
   //shape(int x)
   //{
   //  n = x;
   //  sizes = new int[n];
   //}
-  ~shape()
-  {
-    delete[] sizes;
-  }
+  //~shape()
+  //{
+  //  delete[] sizes;
+  //}
 };
 
 class Neuralnet
@@ -59,7 +61,7 @@ public:
   float** a;
   float** d;
 
-  Neuralnet(struct shape* S, bool sigm=false, float lam=0.05);
+  Neuralnet(struct shape* S);//, bool sigm=false, float lam=0.05);
   ~Neuralnet();
   void eval(float* X, float* y);
   void train(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float alpha=0.25, float decay=0.0);

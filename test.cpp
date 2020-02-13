@@ -11,15 +11,17 @@ int main(int argc, char** argv)
 {
   struct shape S;
   S.n = 5;
-  S.sizes = new int[S.n];
+  //S.sizes = new int[S.n];
   S.sizes[0] = 4;
-  S.sizes[1] = 30;
-  S.sizes[2] = 30;
-  S.sizes[3] = 30;
+  S.sizes[1] = 50;
+  S.sizes[2] = 50;
+  S.sizes[3] = 50;
   S.sizes[4] = 2;
+  S.sigm = false;
+  S.lam = 0.000001;
 
   //Neuralnet N(&S, false, 0.0);
-  Neuralnet N(&S, false, 0.000001);
+  Neuralnet N(&S);//, false, 0.000001);
 
   //backprop test
   vector<float*> X_t;
@@ -87,7 +89,7 @@ int main(int argc, char** argv)
   //  }
   //  cout << "]\n";
   //}
-  N.train(X_t, y_t, X_v, y_v, 400, 0.05, 0.005);
+  N.train(X_t, y_t, X_v, y_v, 800, 0.05, 0.005);
   cout << "backprop test\n";
   for (int l=1; l < S.n; ++l) {
     cout << "[\n";
@@ -117,8 +119,6 @@ int main(int argc, char** argv)
     delete X_t[i];
     delete y_t[i];
   }
-
-  delete S.sizes;
 
   return 0;
 }

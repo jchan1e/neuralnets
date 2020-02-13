@@ -6,14 +6,14 @@
 #include <iostream>
 #include <omp.h>
 
-Neuralnet::Neuralnet(struct shape* S, const bool sigm, const float lam) : g(sigm?&sig:&relu), g_prime(sigm?&sig_prime:&relu_prime)
+Neuralnet::Neuralnet(struct shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?&sig_prime:&relu_prime)
 {
   unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
   default_random_engine generator(seed);
 
-  Lambda = lam;
+  Lambda = S->lam; // lambda ratio to alpha
   s.n = S->n;
-  s.sizes = new int[s.n];
+  //s.sizes = new int[s.n];
   for (int i=0; i < s.n; ++i)
     s.sizes[i] = S->sizes[i];
 
@@ -58,10 +58,14 @@ Neuralnet::Neuralnet(char* filename) : g(), g_prime()
   ifstream f;
   f.open(filename, ios::in | ios::binary);
 
+  f.read((char*)&s.sigm, sizeof(bool));
+
+  f.read((char*)&s.lam, sizeof(float));
+
   f.read((char*)&s.n, sizeof(int));
 
-  s.sizes = new int[s.n];
-  f.read((char*)s.sizes, s.n*sizeof(int));;
+  //s.sizes = new int[s.n];
+  f.read((char*)s.sizes, s.n*sizeof(int));
 
   //cout << s.n << endl;
   //for (int i=0; i < s.n; ++i)
@@ -106,6 +110,8 @@ bool Neuralnet::save(char* filename)
   f.open(filename, ios::binary);
   if (!f)
     return false;
+  f.write((char*)&s.sigm, sizeof(bool));
+  f.write((char*)&s.lam, sizeof(float));
   f.write((char*)&s.n, sizeof(int));
   f.write((char*)s.sizes, s.n*sizeof(int));
   for (int l=1; l < s.n; ++l)
