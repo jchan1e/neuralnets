@@ -9,27 +9,35 @@ using namespace std;
 struct shape
 {
   int n;
-  int* sizes;
+  int sizes[1000] = {0};
+  bool sigm;
+  float lam;
   //shape(int x)
   //{
   //  n = x;
   //  sizes = new int[n];
   //}
-  ~shape()
-  {
-    delete[] sizes;
-  }
+  //~shape()
+  //{
+  //  delete[] sizes;
+  //}
 };
 
 class Neuralnet
 {
 //public:
+typedef float (*ActivFn)(float z);
+
 private:
-// activation function and its derivative
-  float g(float z);
-  void  g(float* A, float* Z, int n);
-  float g_prime(float z);
-  void  g_prime(float* A, float* Z, int n);
+// activation functions and their derivatives
+  static float sig(float z);
+  static float sig_prime(float z);
+  static float relu(float z);
+  static float relu_prime(float z);
+  const ActivFn g;
+  const ActivFn g_prime;
+  void  G(float* A, float* Z, int n);
+  void  G_prime(float* A, float* Z, int n);
 // gradient of the output loss
   float gradC(float a, float y);
   void  gradC(float* D, float* A, float* Y, int n);
@@ -38,11 +46,12 @@ private:
   void forward_prop(float* X, float** lz, float** la, float** lb, float*** lW);
   void back_prop(float* X, float* y);
   void back_prop(float* X, float* y, float** lz, float** la, float** ld, float** lb, float** ldb, float*** lW, float*** ldw);
-  void update_weights(float alpha);
+  void update_weights(float alpha, float lam_len);
   void update_weights(float alpha, float** lb, float** ldb, float*** lW, float*** ldw);
   void update_weights(float** lb, float** ldb, float*** lW, float*** ldW);
 public:
   shape s;
+  float Lambda; // ratio between actual lambda and alpha
   int n_layers;
   float** b;
   float** db;
@@ -52,7 +61,7 @@ public:
   float** a;
   float** d;
 
-  Neuralnet(struct shape* S);
+  Neuralnet(struct shape* S);//, bool sigm=false, float lam=0.05);
   ~Neuralnet();
   void eval(float* X, float* y);
   void train(vector<float*> X_train, vector<float*> y_train, int num_epochs=10, float alpha=0.25, float decay=0.0);

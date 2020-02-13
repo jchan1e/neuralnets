@@ -6,14 +6,14 @@
 #include <iostream>
 #include <omp.h>
 
-Neuralnet::Neuralnet(struct shape* S)
+Neuralnet::Neuralnet(struct shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?&sig_prime:&relu_prime)
 {
   unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
   default_random_engine generator(seed);
-  normal_distribution<float> distribution(0.0,1.0);
 
+  Lambda = S->lam; // lambda ratio to alpha
   s.n = S->n;
-  s.sizes = new int[s.n];
+  //s.sizes = new int[s.n];
   for (int i=0; i < s.n; ++i)
     s.sizes[i] = S->sizes[i];
 
@@ -32,6 +32,7 @@ Neuralnet::Neuralnet(struct shape* S)
     d[i] = new float[s.sizes[i]];
     if (i > 0)
     {
+      normal_distribution<float> distribution(0.0,1.0/s.sizes[i]);
       b[i-1] = new float[s.sizes[i]];
       db[i-1] = new float[s.sizes[i]];
       for (int j=0; j < s.sizes[i]; ++j)
@@ -49,15 +50,22 @@ Neuralnet::Neuralnet(struct shape* S)
   }
 }
 
-Neuralnet::Neuralnet(char* filename)
+Neuralnet::Neuralnet(char* filename) : g(), g_prime()
 {
+  //const ActivFn g(&sig);
+  //const ActivFn g_prime(&sig_prime);
+
   ifstream f;
   f.open(filename, ios::in | ios::binary);
 
+  f.read((char*)&s.sigm, sizeof(bool));
+
+  f.read((char*)&s.lam, sizeof(float));
+
   f.read((char*)&s.n, sizeof(int));
 
-  s.sizes = new int[s.n];
-  f.read((char*)s.sizes, s.n*sizeof(int));;
+  //s.sizes = new int[s.n];
+  f.read((char*)s.sizes, s.n*sizeof(int));
 
   //cout << s.n << endl;
   //for (int i=0; i < s.n; ++i)
@@ -102,6 +110,8 @@ bool Neuralnet::save(char* filename)
   f.open(filename, ios::binary);
   if (!f)
     return false;
+  f.write((char*)&s.sigm, sizeof(bool));
+  f.write((char*)&s.lam, sizeof(float));
   f.write((char*)&s.n, sizeof(int));
   f.write((char*)s.sizes, s.n*sizeof(int));
   for (int l=1; l < s.n; ++l)
@@ -150,25 +160,44 @@ Neuralnet::~Neuralnet()
   delete[] dW;
 }
 
-float Neuralnet::g(float z)
+float Neuralnet::relu(float z)
+{
+  // leaky relu
+  if (z > 0.0)
+    return z;
+  else
+    //return 0.0;
+    return z/100.0;
+}
+float Neuralnet::relu_prime(float z)
+{
+  // leaky relu
+  if (z > 0.0)
+    return 1.0;
+  else
+    //return 0.0;
+    return 0.01;
+}
+
+float Neuralnet::sig(float z)
 {
   return 1.0/(1.0 + exp(-z));
 }
-void Neuralnet::g(float* A, float* Z, int n)
-{ // Activation function
-  for (int i=0; i < n; ++i)
-    A[i] = g(Z[i]);
-}
-
-float Neuralnet::g_prime(float z)
+float Neuralnet::sig_prime(float z)
 {
-  float gz = g(z);
+  float gz = sig(z);
   return gz * (1.0 - gz);
 }
-void Neuralnet::g_prime(float* A, float* Z, int n)
+
+void Neuralnet::G(float* A, float* Z, int n)
+{ // Activation function
+  for (int i=0; i < n; ++i)
+    A[i] = (*g)(Z[i]);
+}
+void Neuralnet::G_prime(float* A, float* Z, int n)
 {
   for (int i=0; i < n; ++i)
-    A[i] = g_prime(Z[i]);
+    A[i] = (*g_prime)(Z[i]);
 }
 
 float Neuralnet::gradC(float a, float y)
@@ -178,21 +207,18 @@ float Neuralnet::gradC(float a, float y)
 void Neuralnet::gradC(float* D, float* A, float* Y, int n)
 {
   for (int i=0; i < n; ++i)
-    D[i] = gradC(A[i], Y[i]) * g_prime(A[i]);
+    D[i] = gradC(A[i], Y[i]) * (*g_prime)(A[i]);
 }
 
 void Neuralnet::forward_prop(float* X)
 {
-//#pragma omp parallel for
   for (int i=0; i < s.sizes[0]; ++i)
   {
     a[0][i] = X[i];
   }
 
-//#pragma omp parallel
   for (int l=1; l< n_layers; ++l)
   {
-//#pragma omp for
     for (int j=0; j < s.sizes[l]; ++j)
     {
       z[l][j] = 0.0;
@@ -201,24 +227,20 @@ void Neuralnet::forward_prop(float* X)
         z[l][j] += a[l-1][i] * W[l-1][i][j];
       }
       z[l][j] += b[l-1][j];
-      a[l][j] = g(z[l][j]);
+      a[l][j] = (*g)(z[l][j]);
     }
-//#pragma omp barrier
   }
 }
 
 void Neuralnet::forward_prop(float* X, float** z, float** a, float** b, float*** W)
 {
-//#pragma omp parallel for
   for (int i=0; i < s.sizes[0]; ++i)
   {
     a[0][i] = X[i];
   }
 
-//#pragma omp parallel
   for (int l=1; l< n_layers; ++l)
   {
-//#pragma omp for
     for (int j=0; j < s.sizes[l]; ++j)
     {
       z[l][j] = 0.0;
@@ -227,9 +249,8 @@ void Neuralnet::forward_prop(float* X, float** z, float** a, float** b, float***
         z[l][j] += a[l-1][i] * W[l-1][i][j];
       }
       z[l][j] += b[l-1][j];
-      a[l][j] = g(z[l][j]);
+      a[l][j] = (*g)(z[l][j]);
     }
-//#pragma omp barrier
   }
 }
 
@@ -240,7 +261,7 @@ void Neuralnet::back_prop(float* X, float* y)
 
   for (int l=s.n-2; l >= 0; --l)
   {
-    //dW[l] = outer(d[l+1], a[l]);
+    //dW[l] = -L*W[l] + outer(d[l+1], a[l]);
     for (int i=0; i < s.sizes[l]; ++i)
     {
       for (int j=0; j < s.sizes[l+1]; ++j)
@@ -263,7 +284,7 @@ void Neuralnet::back_prop(float* X, float* y)
       {
         d[l][i] += d[l+1][j] * W[l][i][j];
       }
-      d[l][i] *= g_prime(z[l][i]);
+      d[l][i] *= (*g_prime)(z[l][i]);
     }
   }
 }
@@ -273,12 +294,10 @@ void Neuralnet::back_prop(float* X, float* y, float** lz, float** la, float** ld
   forward_prop(X, lz, la, lb, lW);
   gradC(ld[s.n-1], la[s.n-1], y, s.sizes[s.n-1]);
 
-//#pragma omp parallel num_threads(6)
 //{
   for (int l=s.n-2; l >= 0; --l)
   {
     //dW[l] = outer(ld[l+1], a[l]);
-//#pragma omp for collapse(2)
     for (int i=0; i < s.sizes[l]; ++i)
     {
       for (int j=0; j < s.sizes[l+1]; ++j)
@@ -288,7 +307,6 @@ void Neuralnet::back_prop(float* X, float* y, float** lz, float** la, float** ld
     }
 
     //db[l] = ld[l+1];
-//#pragma omp single
 //{
     for (int i=0; i < s.sizes[l+1]; ++i)
     {
@@ -297,7 +315,6 @@ void Neuralnet::back_prop(float* X, float* y, float** lz, float** la, float** ld
 //}
 
     //ld[l]  = inner(W[l], ld[l+1]) * g_prime(z[l]);
-//#pragma omp for
     for (int i=0; i < s.sizes[l]; ++i)
     {
       ld[l][i] = 0.0;
@@ -305,9 +322,8 @@ void Neuralnet::back_prop(float* X, float* y, float** lz, float** la, float** ld
       {
         ld[l][i] += ld[l+1][j] * lW[l][i][j];
       }
-      ld[l][i] *= g_prime(lz[l][i]);
+      ld[l][i] *= (*g_prime)(lz[l][i]);
     }
-//#pragma omp barrier
   }
 //}
 }
@@ -319,14 +335,27 @@ void Neuralnet::eval(float* X, float* y)
     y[i] = a[s.n-1][i];
 }
 
-void Neuralnet::update_weights(float alpha)
+void Neuralnet::update_weights(float alpha, float lam)
 {
+  //float lam = 1.0-(alpha*(1.0-lam_len));
+  //for (int l=0; l < s.n-1; ++l)
+  //{
+  //  for (int i=0; i < s.sizes[l]; ++i)
+  //  {
+  //    for (int j=0; j < s.sizes[l+1]; ++j)
+  //    {
+  //      W[l][i][j] *= lam;//*W[l][i][j];
+  //    }
+  //  }
+  //}
   for (int l=0; l < s.n-1; ++l)
   {
     for (int i=0; i < s.sizes[l]; ++i)
     {
       for (int j=0; j < s.sizes[l+1]; ++j)
-        W[l][i][j] -= alpha*dW[l][i][j];
+      {
+        W[l][i][j] = W[l][i][j]*lam - alpha*dW[l][i][j];
+      }
     }
     for (int i=0; i < s.sizes[l+1]; ++i)
     {
@@ -338,12 +367,25 @@ void Neuralnet::update_weights(float alpha)
 
 void Neuralnet::update_weights(float alpha, float** lb, float** ldb, float*** lW, float*** ldW)
 {
+  float lam = 1.0-(alpha*(1.0-Lambda));
+  //for (int l=0; l < s.n-1; ++l)
+  //{
+  //  for (int i=0; i < s.sizes[l]; ++i)
+  //  {
+  //    for (int j=0; j < s.sizes[l+1]; ++j)
+  //    {
+  //      lW[l][i][j] *= lam;//*lW[l][i][j];
+  //    }
+  //  }
+  //}
   for (int l=0; l < s.n-1; ++l)
   {
     for (int i=0; i < s.sizes[l]; ++i)
     {
       for (int j=0; j < s.sizes[l+1]; ++j)
-        lW[l][i][j] -= alpha*ldW[l][i][j];
+      {
+        lW[l][i][j] = lW[l][i][j]*lam - alpha*ldW[l][i][j];
+      }
     }
     for (int i=0; i < s.sizes[l+1]; ++i)
       lb[l][i] -= alpha*ldb[l][i];
@@ -395,15 +437,43 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
       index.push_back(i);
     random_shuffle(index.begin(), index.end());
 
+    //float lam = 1.0 - a*Lambda;
+    //float lam_len = pow(1.0-(Lambda*a), 1.0/index.size()); // = nth-root(Lambda)
+    float lam = 1.0 - a/alpha*Lambda;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(a);
+      update_weights(a, lam);
+      //for (int l=0; l < s.n-1; ++l)
+      //{
+      //  for (int i=0; i < s.sizes[l]; ++i)
+      //  {
+      //    for (int j=0; j < s.sizes[l+1]; ++j)
+      //    {
+      //      W[l][i][j] *= lam;//*W[l][i][j];
+      //    }
+      //  }
+      //}
+      //for (int l=0; l < s.n-1; ++l)
+      //{
+      //  for (int i=0; i < s.sizes[l]; ++i)
+      //  {
+      //    for (int j=0; j < s.sizes[l+1]; ++j)
+      //    {
+      //      W[l][i][j] -= a*dW[l][i][j];
+      //    }
+      //  }
+      //  for (int i=0; i < s.sizes[l+1]; ++i)
+      //  {
+      //    b[l][i] -= a*db[l][i];
+      //    //cout << b[l][i] << "   \t" << db[l][i] << endl;
+      //  }
+      //}
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "    alpha; " << a << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }
@@ -431,10 +501,39 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
     if (decay > 0.0)
       a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
     //cout << "alpha: " << a << endl;
+
+    //float lam = 1.0 - a*Lambda;
+    //float lam_len = pow(1.0-(Lambda*a), 1.0/index.size()); // = nth-root(Lambda)
+    float lam = 1.0 - a/alpha*Lambda;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(a);
+      update_weights(a, lam);
+      //for (int l=0; l < s.n-1; ++l)
+      //{
+      //  for (int i=0; i < s.sizes[l]; ++i)
+      //  {
+      //    for (int j=0; j < s.sizes[l+1]; ++j)
+      //    {
+      //      W[l][i][j] *= lam;//*W[l][i][j];
+      //    }
+      //  }
+      //}
+      //for (int l=0; l < s.n-1; ++l)
+      //{
+      //  for (int i=0; i < s.sizes[l]; ++i)
+      //  {
+      //    for (int j=0; j < s.sizes[l+1]; ++j)
+      //    {
+      //      W[l][i][j] -= a*dW[l][i][j];
+      //    }
+      //  }
+      //  for (int i=0; i < s.sizes[l+1]; ++i)
+      //  {
+      //    b[l][i] -= a*db[l][i];
+      //    //cout << b[l][i] << "   \t" << db[l][i] << endl;
+      //  }
+      //}
     }
 
     if (e%(interval) == 0 || e == num_epochs)
@@ -464,11 +563,9 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
 //    random_shuffle(index.begin(), index.end());
 //
 //    int num_threads;
-//#pragma omp parallel shared(b, db, W, dW)
 //{
 //    num_threads = omp_get_num_threads();
 //    //reset main db/dW
-//#pragma omp single
 //{
 //    for (int i=1; i < s.n; ++i)
 //    {
@@ -514,7 +611,6 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
 //      }
 //    }
 //
-//#pragma omp for nowait
 //    for (unsigned int j=0; j < index.size(); ++j)
 //    {
 //      int i = index[j];
@@ -522,7 +618,6 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
 //      update_weights(alpha, lb, ldb, lW, ldW);
 //    }
 //
-//#pragma omp critical
 //{
 //    update_weights(lb, ldb, lW, ldW);
 //    //cout << "--------\n";
