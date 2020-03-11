@@ -1,5 +1,5 @@
 # Linux
-CFLAGS=-g -std=c++11 -Wall -O3
+CFLAGS=-g -std=c++11 -Wall# -O3
 LFLAGS=
 # Mac
 ifeq "$(shell uname)" "Darwin"
@@ -8,12 +8,14 @@ LFLAGS=
 endif
 
 
-all: neuralnet.o #mnist
+all: neuralnet.o #convnet.o #mnist
 
 
 neuralnet.o: neuralnet.cpp neuralnet.h
-	g++ $(CFLAGS) -c $< # -fopenmp
+	g++ $(CFLAGS) -c $< -fopenmp
 
+convnet.o: convnet.cpp convnet.h
+	g++ $(CFLAGS) -c $< -fopenmp
 
 #mnist: mnist.cpp neuralnet.o connect.o layer.o
 #	g++ $(CFLAGS) -o $@ $^ $(LFLAGS)
@@ -25,7 +27,7 @@ test: test.o
 testp: test.o
 	./test.o "p"
 
-test.o: test.cpp neuralnet.o
+test.o: test.cpp convnet.o
 	g++ $(CFLAGS) -o $@ $^ -fopenmp
 
 
