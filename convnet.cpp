@@ -62,7 +62,7 @@ Convnet::Convnet(struct conv_shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?
           }
         }
         else {
-          int size = s.kernels[i-1][0] * s.kernels[i-1][1];
+          int size = s.kernels[i-1][0] * s.kernels[i-1][1] * s.kernels[i-1][3];
           W[i-1]  = vector<vector<float>>(size);
           dW[i-1] = vector<vector<float>>(size);
           for (int j=0; j < size; ++j) {
@@ -75,22 +75,26 @@ Convnet::Convnet(struct conv_shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?
       }
     }
     else { // convolution layer
-      zk[i] = vector<vector<float>>(s.kernels[i][2]);
-      ak[i] = vector<vector<float>>(s.kernels[i][2]);
-      dk[i] = vector<vector<float>>(s.kernels[i][2]);
-      for (int j=0; j < s.kernels[i][2]; ++j) { // grid unrolled in memory
+      zk[i] = vector<vector<float>>(s.kernels[i][3]);
+      ak[i] = vector<vector<float>>(s.kernels[i][3]);
+      dk[i] = vector<vector<float>>(s.kernels[i][3]);
+      for (int j=0; j < s.kernels[i][3]; ++j) { // grid unrolled in memory
         zk[i][j] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
         ak[i][j] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
         dk[i][j] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
       }
       if (i > 0) {
-        normal_distribution<float> distribution(0.0,1.0/(s.kernels[i][2]*s.kernels[i][2]*s.kernels[i][3]));
+        normal_distribution<float> distribution(0.0,1.0/(s.kernels[i][2]*s.kernels[i][2]*s.kernels[i-1][3]));
 
-        b[i-1] = vector<float>(s.kernels[i][0]*s.kernels[i][1]);
-        db[i-1] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
-        for (int j=0; j < s.kernels[i][0]*s.kernels[i][1]; ++j)
-          b[i-1][j] = distribution(generator);
-        //b[i-1].shrink_to_fit();
+        bk[i-1] = vector<vector<float>>(s.kernels[i][3]);
+        dbk[i-1] = vector<vector<float>>(s.kernels[i][3]);
+        for (int j=0; j < s.kernels[i][3]; ++j) {
+          bk[i-1][j] = vector<float>(s.kernels[i][0]*s.kernels[i][1]);
+          dbk[i-1][j] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
+          for (int k=0; k < s.kernels[i][0]*s.kernels[i][1]; ++k)
+            bk[i-1][j][k] = distribution(generator);
+          //bk[i-1].shrink_to_fit();
+        }
 
         if (s.sizes[i-1] > 0) { // from previous non-convolutional layer
           //// As of yet unsupported
@@ -227,16 +231,16 @@ Convnet::Convnet(char* filename) : g(), g_prime()
       }
     }
     else { // convolution layer
-      zk[i] = vector<vector<float>>(s.kernels[i][2]);
-      ak[i] = vector<vector<float>>(s.kernels[i][2]);
-      dk[i] = vector<vector<float>>(s.kernels[i][2]);
-      for (int j=0; j < s.kernels[i][2]; ++j) { // grid unrolled in memory
+      zk[i] = vector<vector<float>>(s.kernels[i][3]);
+      ak[i] = vector<vector<float>>(s.kernels[i][3]);
+      dk[i] = vector<vector<float>>(s.kernels[i][3]);
+      for (int j=0; j < s.kernels[i][3]; ++j) { // grid unrolled in memory
         zk[i][j] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
         ak[i][j] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
         dk[i][j] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
       }
       if (i > 0) {
-        normal_distribution<float> distribution(0.0,1.0/(s.kernels[i][2]*s.kernels[i][2]*s.kernels[i][3]));
+        //normal_distribution<float> distribution(0.0,1.0/(s.kernels[i][2]*s.kernels[i][2]*s.kernels[i][3]));
 
         b[i-1] = vector<float>(s.kernels[i][0]*s.kernels[i][1]);
         db[i-1] = vector<float>(s.kernels[i][0]*s.kernels[i][1], 0.0);
@@ -392,7 +396,7 @@ float Convnet::relu(float z)
     return z;
   else
     //return 0.0;
-    return z/100.0;
+    return z*0.01;
 }
 float Convnet::relu_prime(float z)
 {
@@ -610,8 +614,8 @@ void Convnet::back_prop(vector<vector<float>> X, vector<float> y)
           for (int i=0; i < s.kernels[l][0]*s.kernels[l][1]; ++i) {
             for (int j=0; j < s.sizes[l+1]; ++j) {
               dW[l][ii][j] = d[l+1][j] * ak[l][k][i];
-              ++ii;
             }
+            ++ii;
           }
         }
 
@@ -872,17 +876,37 @@ void Convnet::update_weights(float alpha, float lam)
 {
   for (int l=0; l < s.n-1; ++l)
   {
-    for (int i=0; i < s.sizes[l]; ++i)
-    {
-      for (int j=0; j < s.sizes[l+1]; ++j)
+    if (s.sizes[l+1] > 0) { //fully connected
+      if (s.sizes[l] > 0) { //from fully connected
+        for (int i=0; i < s.sizes[l]; ++i) {
+          for (int j=0; j < s.sizes[l+1]; ++j) {
+            W[l][i][j] = W[l][i][j]*lam - alpha*dW[l][i][j];
+          }
+        }
+      }
+      else { //from convolution
+        for (int i=0; i < s.kernels[l][0]*s.kernels[l][1]*s.kernels[l][3]; ++i) {
+          for (int j=0; j < s.sizes[l+1]; ++j) {
+            W[l][i][j] = W[l][i][j]*lam - alpha*dW[l][i][j];
+          }
+        }
+      }
+      for (int i=0; i < s.sizes[l+1]; ++i)
       {
-        W[l][i][j] = W[l][i][j]*lam - alpha*dW[l][i][j];
+        b[l][i] -= alpha*db[l][i];
       }
     }
-    for (int i=0; i < s.sizes[l+1]; ++i)
-    {
-      b[l][i] -= alpha*db[l][i];
-      //cout << b[l][i] << "   \t" << db[l][i] << endl;
+    else { // convolution
+      for (int k=0; k < s.kernels[l+1][3]; ++k) {
+        for (int k0=0; k0 < s.kernels[l][3]; ++k0) {
+          for (int i=0; i < s.kernels[l+1][2]*s.kernels[l+1][2]; ++i) {
+            Wk[l][k][k0][i] = Wk[l][k][k0][i]*lam - alpha * dWk[l][k][k0][i];
+          }
+        }
+        for (int i=0; i < s.kernels[l+1][0]*s.kernels[l+1][1]; ++i) {
+          bk[l][k][i] -= alpha*dbk[l][k][i];
+        }
+      }
     }
   }
 }
@@ -929,8 +953,12 @@ void Convnet::update_weights(vector<vector<float>> lb, vector<vector<float>> ldb
 
 void Convnet::train(vector<vector<float>> X_train, vector<vector<float>> y_train, int num_epochs, float alpha, float decay)
 {
-  int interval = 10;
-  if (num_epochs >= 200)
+  int interval = 1;
+  if (num_epochs >= 20)
+    interval = 5;
+  if (num_epochs >= 100)
+    interval = 10;
+  if (num_epochs >= 300)
     interval = 20;
   if (num_epochs >= 1000)
     interval = 50;
@@ -938,35 +966,39 @@ void Convnet::train(vector<vector<float>> X_train, vector<vector<float>> y_train
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
-  float a = alpha;
+  float al = alpha;
   for (int e=1; e <= num_epochs; ++e)
   {
     if (decay > 0.0)
-      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
-    //cout << "alpha: " << a << endl;
+      al = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+    //cout << "alpha: " << al << endl;
     vector<int> index;
     for (unsigned int i=0; i < X_train.size(); ++i)
       index.push_back(i);
     random_shuffle(index.begin(), index.end());
 
-    float lam = 1.0 - a/alpha*Lambda;
+    float lam = 1.0 - al/alpha*Lambda;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(a, lam);
+      update_weights(al, lam);
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha: " << al << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }
 }
 void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<float>> y_train, int num_epochs, float alpha, float decay)
 {
-  int interval = 10;
-  if (num_epochs >= 200)
+  int interval = 1;
+  if (num_epochs >= 20)
+    interval = 5;
+  if (num_epochs >= 100)
+    interval = 10;
+  if (num_epochs >= 300)
     interval = 20;
   if (num_epochs >= 1000)
     interval = 50;
@@ -974,35 +1006,39 @@ void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<float>>
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
-  float a = alpha;
+  float al = alpha;
   for (int e=1; e <= num_epochs; ++e)
   {
     if (decay > 0.0)
-      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
-    //cout << "alpha: " << a << endl;
+      al = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+    //cout << "alpha: " << al << endl;
     vector<int> index;
     for (unsigned int i=0; i < X_train.size(); ++i)
       index.push_back(i);
     random_shuffle(index.begin(), index.end());
 
-    float lam = 1.0 - a/alpha*Lambda;
+    float lam = 1.0 - al/alpha*Lambda;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(a, lam);
+      update_weights(al, lam);
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha: " << al << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }
 }
 void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<vector<float>>> y_train, int num_epochs, float alpha, float decay)
 {
-  int interval = 10;
-  if (num_epochs >= 200)
+  int interval = 1;
+  if (num_epochs >= 20)
+    interval = 5;
+  if (num_epochs >= 100)
+    interval = 10;
+  if (num_epochs >= 300)
     interval = 20;
   if (num_epochs >= 1000)
     interval = 50;
@@ -1010,27 +1046,27 @@ void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<vector<
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
-  float a = alpha;
+  float al = alpha;
   for (int e=1; e <= num_epochs; ++e)
   {
     if (decay > 0.0)
-      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
-    //cout << "alpha: " << a << endl;
+      al = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+    //cout << "alpha: " << al << endl;
     vector<int> index;
     for (unsigned int i=0; i < X_train.size(); ++i)
       index.push_back(i);
     random_shuffle(index.begin(), index.end());
 
-    float lam = 1.0 - a/alpha*Lambda;
+    float lam = 1.0 - al/alpha*Lambda;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(a, lam);
+      update_weights(al, lam);
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha: " << al << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }
@@ -1038,8 +1074,12 @@ void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<vector<
 
 void Convnet::train(vector<vector<float>> X_train, vector<vector<float>> y_train, vector<vector<float>> X_valid, vector<vector<float>> y_valid, int num_epochs, float alpha, float decay)
 {
-  int interval = 10;
-  if (num_epochs >= 200)
+  int interval = 1;
+  if (num_epochs >= 20)
+    interval = 5;
+  if (num_epochs >= 100)
+    interval = 10;
+  if (num_epochs >= 300)
     interval = 20;
   if (num_epochs >= 1000)
     interval = 50;
@@ -1047,7 +1087,7 @@ void Convnet::train(vector<vector<float>> X_train, vector<vector<float>> y_train
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
-  float a = alpha;
+  float al = alpha;
   for (int e=1; e <= num_epochs; ++e)
   {
     vector<int> index;
@@ -1056,29 +1096,33 @@ void Convnet::train(vector<vector<float>> X_train, vector<vector<float>> y_train
     random_shuffle(index.begin(), index.end());
 
     if (decay > 0.0)
-      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+      al = alpha * pow(decay/alpha, (float)(e)/num_epochs);
     //cout << "alpha: " << a << endl;
 
     //float lam = 1.0 - a*Lambda;
     //float lam_len = pow(1.0-(Lambda*a), 1.0/index.size()); // = nth-root(Lambda)
-    float lam = 1.0 - a/alpha*Lambda;
+    float lam = 1.0 - al/alpha*Lambda;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(a, lam);
+      update_weights(al, lam);
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha: " << al << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }
 }
-void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<float>> y_train, vector<vector<vector<float>>> X_valid, vector<vector<float>> y_valid, int num_epochs, float alpha, float decay)
-{
-  int interval = 10;
-  if (num_epochs >= 200)
+void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<float>> y_train, vector<vector<vector<float>>> X_valid, vector<vector<float>> y_valid, int num_epochs, float alpha, float decay) {
+
+  int interval = 1;
+  if (num_epochs >= 20)
+    interval = 5;
+  if (num_epochs >= 100)
+    interval = 10;
+  if (num_epochs >= 300)
     interval = 20;
   if (num_epochs >= 1000)
     interval = 50;
@@ -1086,7 +1130,7 @@ void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<float>>
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
-  float a = alpha;
+  float al = alpha;
   for (int e=1; e <= num_epochs; ++e)
   {
     vector<int> index;
@@ -1095,29 +1139,34 @@ void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<float>>
     random_shuffle(index.begin(), index.end());
 
     if (decay > 0.0)
-      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+      al = alpha * pow(decay/alpha, (float)(e)/num_epochs);
     //cout << "alpha: " << a << endl;
 
     //float lam = 1.0 - a*Lambda;
     //float lam_len = pow(1.0-(Lambda*a), 1.0/index.size()); // = nth-root(Lambda)
-    float lam = 1.0 - a/alpha*Lambda;
+    float lam = 1.0 - al/alpha*Lambda;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(a, lam);
+      update_weights(al, lam);
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha: " << al << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }
 }
 void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<vector<float>>> y_train, vector<vector<vector<float>>> X_valid, vector<vector<vector<float>>> y_valid, int num_epochs, float alpha, float decay)
 {
-  int interval = 10;
-  if (num_epochs >= 200)
+
+  int interval = 1;
+  if (num_epochs >= 20)
+    interval = 5;
+  if (num_epochs >= 100)
+    interval = 10;
+  if (num_epochs >= 300)
     interval = 20;
   if (num_epochs >= 1000)
     interval = 50;
@@ -1125,7 +1174,7 @@ void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<vector<
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
-  float a = alpha;
+  float al = alpha;
   for (int e=1; e <= num_epochs; ++e)
   {
     vector<int> index;
@@ -1134,21 +1183,21 @@ void Convnet::train(vector<vector<vector<float>>> X_train, vector<vector<vector<
     random_shuffle(index.begin(), index.end());
 
     if (decay > 0.0)
-      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+      al = alpha * pow(decay/alpha, (float)(e)/num_epochs);
     //cout << "alpha: " << a << endl;
 
     //float lam = 1.0 - a*Lambda;
     //float lam_len = pow(1.0-(Lambda*a), 1.0/index.size()); // = nth-root(Lambda)
-    float lam = 1.0 - a/alpha*Lambda;
+    float lam = 1.0 - al/alpha*Lambda;
     for (int i : index)
     {
       back_prop(X_train[i], y_train[i]);
-      update_weights(a, lam);
+      update_weights(al, lam);
     }
 
     if (e%(interval) == 0 || e == num_epochs)
     {
-      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
+      cout << "epoch: " << e << "    alpha: " << al << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
     }
   }

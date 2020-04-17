@@ -13,13 +13,18 @@ int main(int argc, char** argv)
   S.n = 5;
   S.sizes = vector<int>(S.n);
   S.kernels = vector<array<int, 4>>(S.n);
-  S.sizes[0] = 0;   S.kernels[0] = {8, 8, 1, 1};
-  S.sizes[1] = 0;   S.kernels[1] = {8, 8, 3, 64};
-  S.sizes[2] = 0;   S.kernels[2] = {8, 8, 3, 64};
-  S.sizes[3] = 256; S.kernels[3] = {0, 0, 0, 0};
+  S.sizes[0] = 0;   S.kernels[0] = {5, 5, 1, 2};
+  S.sizes[1] = 0;   S.kernels[1] = {5, 5, 3, 8};
+  S.sizes[2] = 0;   S.kernels[2] = {5, 5, 3, 8};
+  S.sizes[3] = 0;   S.kernels[3] = {5, 5, 3, 8};
   S.sizes[4] = 2;   S.kernels[4] = {0, 0, 0, 0};
+  //S.sizes[0] = 0;   S.kernels[0] = {5, 5, 1, 2};
+  //S.sizes[1] = 0;   S.kernels[1] = {5, 5, 3, 4};
+  //S.sizes[2] = 0;   S.kernels[2] = {5, 5, 3, 4};
+  //S.sizes[3] = 256; S.kernels[3] = {0, 0, 0, 0};
+  //S.sizes[4] = 2;   S.kernels[4] = {0, 0, 0, 0};
   S.sigm = false;
-  S.lam = 0.000001;
+  S.lam = 0.00001;
 
   //Neuralnet N(&S, false, 0.0);
   Convnet N(&S);//, false, 0.000001);
@@ -34,10 +39,10 @@ int main(int argc, char** argv)
   //for (int i=0; i < 16384*2; ++i) {
   for (int i=0; i < 2048*2; ++i) {
     vector<vector<float>> X = vector<vector<float>>(2);
-    X[0] = vector<float>(64);
-    X[1] = vector<float>(64);
+    X[0] = vector<float>(25);
+    X[1] = vector<float>(25);
     vector<float> y = vector<float>(2);
-    for (int j=0; j < 64; ++j) {
+    for (int j=0; j < 25; ++j) {
       X[0][j] = (double)rand()/RAND_MAX*2.0 - 1.0;
       X[1][j] = (double)rand()/RAND_MAX*2.0 - 1.0;
       double fm0 = fmod(X[0][j], 0.25);
@@ -50,11 +55,11 @@ int main(int argc, char** argv)
     //M = max(M, fmod(abs(X[0]), 0.25));
     //m = min(m, fmod(abs(X[0]), 0.25));
     int modsum = 0;
-    for (int j=0; j < 64; ++j) {
-      modsum += (int)(X[0][j]*1.5)%2;
-      modsum += (int)(X[1][j]*1.5)%2;
+    for (int j=0; j < 25; ++j) {
+      modsum += (int)(X[0][j]*1.5)%4;
+      modsum += (int)(X[1][j]*1.5)%4;
     }
-    if (modsum%2 == 0) {
+    if (modsum%4 == 0) {
       y[0] = 0.0;
       y[1] = 1.0;
     }
@@ -91,7 +96,7 @@ int main(int argc, char** argv)
   //  }
   //  cout << "]\n";
   //}
-  N.train(X_t, y_t, X_v, y_v, 400, 0.05, 0.005);
+  N.train(X_t, y_t, X_v, y_v, 99, 0.05, 0.005);
   //cout << "backprop test\n";
   //for (int l=1; l < S.n; ++l) {
   //  cout << "[\n";

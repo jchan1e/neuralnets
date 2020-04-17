@@ -1,5 +1,5 @@
 # Linux
-CFLAGS=-g -std=c++11 -Wall# -O3
+CFLAGS=-g -std=c++11 -Wall -O3
 LFLAGS=
 # Mac
 ifeq "$(shell uname)" "Darwin"
