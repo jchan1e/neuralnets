@@ -9,7 +9,7 @@ using namespace std;
 struct shape
 {
   int n;
-  int sizes[1000] = {0};
+  int sizes[64] = {0};
   bool sigm;
   float lam;
   //shape(int x)
