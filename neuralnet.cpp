@@ -54,7 +54,7 @@ Neuralnet::Neuralnet(char* filename)
   ifstream f;
   f.open(filename, ios::in | ios::binary);
 
-  f.read((char*)&s.n, sizeof(int));
+  f.read((char*)&(s.n), sizeof(int));
 
   s.sizes = new int[s.n];
   f.read((char*)s.sizes, s.n*sizeof(int));;
@@ -84,7 +84,7 @@ Neuralnet::Neuralnet(char* filename)
       f.read((char*)b[i-1], s.sizes[i]*sizeof(float));
       W[i-1] = new float*[s.sizes[i-1]];
       dW[i-1] = new float*[s.sizes[i-1]];
-      
+
       for (int j=0; j < s.sizes[i-1]; ++j)
       {
         W[i-1][j] = new float[s.sizes[i]];
@@ -99,10 +99,10 @@ Neuralnet::Neuralnet(char* filename)
 bool Neuralnet::save(char* filename)
 {
   ofstream f;
-  f.open(filename, ios::binary);
+  f.open(filename, ios::out | ios::binary);
   if (!f)
     return false;
-  f.write((char*)&s.n, sizeof(int));
+  f.write((char*)&(s.n), sizeof(int));
   f.write((char*)s.sizes, s.n*sizeof(int));
   for (int l=1; l < s.n; ++l)
   {
@@ -583,7 +583,7 @@ float Neuralnet::loss(vector<float*> X_train, vector<float*> y_train)
     for (int j=0; j < s.sizes[s.n-1]; ++j)
     {
       float diff = a[s.n-1][j] - y_train[i][j];
-      if (0.5 * diff * diff < 0)
+      if (isnan(diff))
         cout << "wtf" << endl;
       L += 0.5 * diff * diff;
     }
