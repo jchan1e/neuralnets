@@ -34,8 +34,8 @@ private:
   static float sig_prime(float z);
   static float relu(float z);
   static float relu_prime(float z);
-  const ActivFn g;
-  const ActivFn g_prime;
+  ActivFn g;
+  ActivFn g_prime;
   void  G(float* A, float* Z, int n);
   void  G_prime(float* A, float* Z, int n);
 // gradient of the output loss
@@ -70,6 +70,7 @@ public:
   //void train_parallel(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs=10, float alpha=0.25);
   float loss(vector<float*> X_train, vector<float*> y_train);
   bool save(char* filename);
+  bool load(char* filename);
   Neuralnet(char* filename);
 };
 

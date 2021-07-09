@@ -5,6 +5,8 @@
 #include <chrono>
 #include <iostream>
 #include <omp.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 Neuralnet::Neuralnet(struct shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?&sig_prime:&relu_prime)
 {
@@ -52,9 +54,6 @@ Neuralnet::Neuralnet(struct shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?&
 
 Neuralnet::Neuralnet(char* filename) : g(), g_prime()
 {
-  //const ActivFn g(&sig);
-  //const ActivFn g_prime(&sig_prime);
-
   ifstream f;
   f.open(filename, ios::in | ios::binary);
 
@@ -66,6 +65,9 @@ Neuralnet::Neuralnet(char* filename) : g(), g_prime()
 
   //s.sizes = new int[s.n];
   f.read((char*)s.sizes, s.n*sizeof(int));
+
+  g = s.sigm?&sig:&relu;
+  g_prime = s.sigm?&sig_prime:&relu_prime;
 
   //cout << s.n << endl;
   //for (int i=0; i < s.n; ++i)
@@ -120,6 +122,96 @@ bool Neuralnet::save(char* filename)
     for (int i=0; i < s.sizes[l-1]; ++i)
     {
       f.write((char*)W[l-1][i], s.sizes[l]*sizeof(float));
+    }
+  }
+  return true;
+}
+
+bool Neuralnet::load(char* filename)
+{
+  //cout << "Deleting N\n";
+  delete z[0];
+  delete a[0];
+  delete d[0];
+  for (int i=1; i < n_layers; ++i)
+  {
+    //cout << "deleting z/a/d[" << i << "]\n";
+    delete z[i];
+    delete a[i];
+    delete d[i];
+    //delete connections[i-1];
+    for (int j=0; j < s.sizes[i-1]; ++j)
+    {
+      //cout << "deleting W[" << i-1 << "][" << j << "] of " << s.sizes[i-1] << "\n";
+      delete W[i-1][j];
+      delete dW[i-1][j];
+    }
+    //cout << "deleting W/b[" << i-1 << "]\n";
+    delete b[i-1];
+    delete db[i-1];
+    delete[] W[i-1];
+    delete[] dW[i-1];
+  }
+  //cout << "deleting top level arrays\n";
+  delete[] z;
+  delete[] a;
+  delete[] d;
+  delete[] b;
+  delete[] db;
+  delete[] W;
+  delete[] dW;
+
+  //const ActivFn g(&sig);
+  //const ActivFn g_prime(&sig_prime);
+
+  ifstream f;
+  f.open(filename, ios::in | ios::binary);
+
+  if (!f)
+    return false;
+
+  f.read((char*)&s.sigm, sizeof(bool));
+
+  f.read((char*)&s.lam, sizeof(float));
+
+  f.read((char*)&s.n, sizeof(int));
+
+  //s.sizes = new int[s.n];
+  f.read((char*)s.sizes, s.n*sizeof(int));
+
+  //cout << s.n << endl;
+  //for (int i=0; i < s.n; ++i)
+  //  cout << s.sizes[i] << endl;
+
+  n_layers = s.n;
+  z  = new float*[s.n];
+  a  = new float*[s.n];
+  d  = new float*[s.n];
+  b  = new float*[s.n-1];
+  db = new float*[s.n-1];
+  W  = new float**[s.n-1];
+  dW = new float**[s.n-1];
+  for (int i=0; i < s.n; ++i)
+  {
+    z[i] = new float[s.sizes[i]];
+    a[i] = new float[s.sizes[i]];
+    d[i] = new float[s.sizes[i]];
+    if (i > 0)
+    {
+      b[i-1] = new float[s.sizes[i]];
+      db[i-1] = new float[s.sizes[i]];
+      //cout << i << "\tb: " << s.sizes[i] << endl;
+      f.read((char*)b[i-1], s.sizes[i]*sizeof(float));
+      W[i-1] = new float*[s.sizes[i-1]];
+      dW[i-1] = new float*[s.sizes[i-1]];
+
+      for (int j=0; j < s.sizes[i-1]; ++j)
+      {
+        W[i-1][j] = new float[s.sizes[i]];
+        dW[i-1][j] = new float[s.sizes[i]];
+        //cout << i << "\tW[" << j << "] " << s.sizes[i] << endl;
+        f.read((char*)W[i-1][j], s.sizes[i]*sizeof(float));
+      }
     }
   }
   return true;
@@ -417,6 +509,7 @@ void Neuralnet::update_weights(float** lb, float** ldb, float*** lW, float*** ld
 
 void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_epochs, float alpha, float decay)
 {
+  int pid = getpid();
   int interval = 10;
   if (num_epochs >= 200)
     interval = 20;
@@ -426,8 +519,13 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
+  char filename[80];
+  sprintf(filename, "/tmp/%d_%d.nn", pid, 0);
+  save(filename);
+
   float a = alpha;
-  for (int e=1; e <= num_epochs; ++e)
+  bool quit = false;
+  for (int e=1; quit == false; ++e)
   {
     if (decay > 0.0)
       a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
@@ -471,16 +569,42 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
       //}
     }
 
-    if (e%(interval) == 0 || e == num_epochs)
+    if (e%(interval) == 0)
     {
-      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+      float losses[3];
+      losses[0] = loss(X_train, y_train);
+      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << losses[0] << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
+
+      char filename0[80];
+      sprintf(filename0, "/tmp/%d_%d.nn", pid, e/interval);
+      save(filename0);
+
+      if (e/interval > 1)
+      {
+        char filename1[80];
+        char filename2[80];
+        sprintf(filename1, "/tmp/%d_%d.nn", pid, e/interval - 1);
+        sprintf(filename2, "/tmp/%d_%d.nn", pid, e/interval - 2);
+
+        Neuralnet M1 = Neuralnet(filename1);
+        Neuralnet M2 = Neuralnet(filename2);
+        losses[1] = M1.loss(X_train, y_train);
+        losses[2] = M2.loss(X_train, y_train);
+
+        if (losses[0] > losses[1] && losses[0] > losses[2])
+        {
+          quit = true;
+          load(filename1);
+        }
+      }
     }
   }
 }
 
 void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs, float alpha, float decay)
 {
+  int pid = getpid();
   int interval = 10;
   if (num_epochs >= 200)
     interval = 20;
@@ -490,8 +614,13 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
+  char filename[80];
+  sprintf(filename, "/tmp/%d_%d.nn", pid, 0);
+  save(filename);
+
   float a = alpha;
-  for (int e=1; e <= num_epochs; ++e)
+  bool quit = false;
+  for (int e=1; !quit; ++e)
   {
     vector<int> index;
     for (unsigned int i=0; i < X_train.size(); ++i)
@@ -499,7 +628,7 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
     random_shuffle(index.begin(), index.end());
 
     if (decay > 0.0)
-      a = alpha * pow(decay/alpha, (float)(e)/num_epochs);
+      a = alpha * pow(decay/alpha, min(1.0f, (float)(e)/num_epochs));
     //cout << "alpha: " << a << endl;
 
     //float lam = 1.0 - a*Lambda;
@@ -536,10 +665,35 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
       //}
     }
 
-    if (e%(interval) == 0 || e == num_epochs)
+    if (e%(interval) == 0)
     {
-      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
+      float losses[3];
+      losses[0] = loss(X_valid, y_valid);
+      cout << "epoch: " << e << "    alpha: " << a << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << losses[0] << endl;// "   \t";
       //cout << W[s.n-2][0][0] << "  \t" << dW[s.n-2][0][0] << endl;
+
+      char filename0[32] = {0};
+      sprintf(filename0, "/tmp/%d_%d.nn", pid, e/interval);
+      save(filename0);
+
+      if (e/interval > 1)
+      {
+        char filename1[32] = {0};
+        char filename2[32] = {0};
+        sprintf(filename1, "/tmp/%d_%d.nn", pid, e/interval - 1);
+        sprintf(filename2, "/tmp/%d_%d.nn", pid, e/interval - 2);
+
+        Neuralnet M1 = Neuralnet(filename1);
+        Neuralnet M2 = Neuralnet(filename2);
+        losses[1] = M1.loss(X_valid, y_valid);
+        losses[2] = M2.loss(X_valid, y_valid);
+
+        if (losses[0] > losses[1] && losses[0] > losses[2])
+        {
+          quit = true;
+          load(filename1);
+        }
+      }
     }
   }
 }
