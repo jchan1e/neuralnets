@@ -14,6 +14,7 @@ Neuralnet::Neuralnet(struct shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?&
   default_random_engine generator(seed);
 
   Lambda = S->lam; // lambda ratio to alpha
+  s.lam = S->lam;
   s.n = S->n;
   //s.sizes = new int[s.n];
   for (int i=0; i < s.n; ++i)
