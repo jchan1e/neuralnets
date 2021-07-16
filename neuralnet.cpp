@@ -16,6 +16,7 @@ Neuralnet::Neuralnet(struct shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?&
   Lambda = S->lam; // lambda ratio to alpha
   s.lam = S->lam;
   s.n = S->n;
+  s.sigm = S->sigm;
   //s.sizes = new int[s.n];
   for (int i=0; i < s.n; ++i)
     s.sizes[i] = S->sizes[i];
@@ -35,11 +36,17 @@ Neuralnet::Neuralnet(struct shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?&
     d[i] = new float[s.sizes[i]];
     if (i > 0)
     {
-      normal_distribution<float> distribution(0.0,1.0/s.sizes[i]);
+      //normal_distribution<float> sigm(0.0, 0.25*sqrt(6.0)/sqrt(s.sizes[i-1]+s.sizes[i])); // Xavier initialization for Sigmoid
+      float bound = sqrt(6.0)/sqrt(s.sizes[i-1]+s.sizes[i]); // Normalized Xavier initialization for Sigmoid
+      uniform_real_distribution<float> sigm_generator(-bound, bound); // Normalized Xavier initialization for Sigmoid
+      normal_distribution<float> relu_generator(0.0, sqrt(2.0/s.sizes[i-1])); // He initialization for ReLu
       b[i-1] = new float[s.sizes[i]];
       db[i-1] = new float[s.sizes[i]];
       for (int j=0; j < s.sizes[i]; ++j)
-        b[i-1][j] = distribution(generator);
+        if (s.sigm)
+          b[i-1][j] = sigm_generator(generator);
+        else
+          b[i-1][j] = relu_generator(generator);
       W[i-1] = new float*[s.sizes[i-1]];
       dW[i-1] = new float*[s.sizes[i-1]];
       for (int j=0; j < s.sizes[i-1]; ++j)
@@ -47,7 +54,10 @@ Neuralnet::Neuralnet(struct shape* S) : g(S->sigm?&sig:&relu), g_prime(S->sigm?&
         W[i-1][j] = new float[s.sizes[i]];
         dW[i-1][j] = new float[s.sizes[i]];
         for (int k=0; k < s.sizes[i]; ++k)
-          W[i-1][j][k] = distribution(generator);
+          if (s.sigm)
+            W[i-1][j][k] = sigm_generator(generator);
+          else
+            W[i-1][j][k] = relu_generator(generator);
       }
     }
   }
