@@ -603,7 +603,7 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
         losses[1] = M1.loss(X_train, y_train);
         losses[2] = M2.loss(X_train, y_train);
 
-        if ((losses[0] > losses[1] && losses[0] > losses[2]) || isnan(losses[0]))
+        if ((e >= num_epochs && ((losses[0] > losses[1] && losses[0] > losses[2]))) || isnan(losses[0]))
         {
           quit = true;
           load(filename1);
@@ -699,7 +699,7 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
         losses[1] = M1.loss(X_valid, y_valid);
         losses[2] = M2.loss(X_valid, y_valid);
 
-        if ((losses[0] > losses[1] && losses[0] > losses[2]) || isnan(losses[0]))
+        if ((e >= num_epochs && ((losses[0] > losses[1] && losses[0] > losses[2]))) || isnan(losses[0]))
         {
           quit = true;
           load(filename1);
