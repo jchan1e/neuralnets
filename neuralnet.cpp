@@ -527,7 +527,8 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
   if (num_epochs >= 1000)
     interval = 50;
 
-  cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << endl;// "   \t";
+  float loss_0 = loss(X_train, y_train);
+  cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss_0 << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
   char filename[80];
@@ -536,6 +537,12 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
 
   float a = alpha;
   bool quit = false;
+
+  if (isnan(loss_0)) {
+    cout << "NaN network can be found at /tmp/" << pid << "_" << filename << endl;
+    quit = true;
+  }
+
   for (int e=1; quit == false; ++e)
   {
     if (decay > 0.0)
@@ -603,7 +610,8 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
         losses[1] = M1.loss(X_train, y_train);
         losses[2] = M2.loss(X_train, y_train);
 
-        if ((e >= num_epochs/2 && ((losses[0] > losses[1] && losses[0] > losses[2]))) || isnan(losses[0]))
+        //if ((e >= num_epochs/2 && ((losses[0] > losses[1] && losses[0] > losses[2]))) || isnan(losses[0]))
+        if ((losses[0] > losses[1] && losses[0] > losses[2]+(losses[2]-losses[1])) || isnan(losses[0]))
         {
           quit = true;
           load(filename1);
@@ -622,7 +630,10 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
   if (num_epochs >= 1000)
     interval = 50;
 
-  cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss(X_train, y_train) << "\tValidation Loss: " << loss(X_valid, y_valid) << endl;// "   \t";
+  float loss_t = loss(X_train, y_train);
+  float loss_v = loss(X_valid, y_valid);
+
+  cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss_t << "\tValidation Loss: " << loss_v << endl;// "   \t";
   //cout << W[s.n-2][0][0] << "\t" << dW[s.n-2][0][0] << endl;
 
   char filename[80];
@@ -631,6 +642,12 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
 
   float a = alpha;
   bool quit = false;
+
+  if (isnan(loss_v)) {
+    cout << "NaN network can be found at /tmp/" << pid << "_" << filename << endl;
+    quit = true;
+  }
+
   for (int e=1; !quit; ++e)
   {
     vector<int> index;
@@ -699,7 +716,8 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
         losses[1] = M1.loss(X_valid, y_valid);
         losses[2] = M2.loss(X_valid, y_valid);
 
-        if ((e >= num_epochs/2 && ((losses[0] > losses[1] && losses[0] > losses[2]))) || isnan(losses[0]))
+        //if ((e >= num_epochs/2 && ((losses[0] > losses[1] && losses[0] > losses[2]))) || isnan(losses[0]))
+        if ((losses[0] > losses[1] && losses[0] > losses[2]+(losses[2]-losses[1])) || isnan(losses[0]))
         {
           quit = true;
           load(filename1);
