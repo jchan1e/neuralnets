@@ -521,11 +521,19 @@ void Neuralnet::update_weights(float** lb, float** ldb, float*** lW, float*** ld
 void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_epochs, float alpha, float decay)
 {
   int pid = getpid();
-  int interval = 10;
+  int interval = 1;
+  if (num_epochs >= 20)
+    interval = 2;
+  if (num_epochs >= 50)
+    interval = 5;
+  if (num_epochs >= 100)
+    interval = 10;
   if (num_epochs >= 200)
     interval = 20;
-  if (num_epochs >= 1000)
+  if (num_epochs >= 500)
     interval = 50;
+  if (num_epochs >= 1000)
+    interval = 100;
 
   float loss_0 = loss(X_train, y_train);
   cout << "epoch: " << 0 << "    alpha: " << alpha << "\tTrain loss: " << loss_0 << endl;// "   \t";
@@ -611,7 +619,7 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
         losses[2] = M2.loss(X_train, y_train);
 
         //if ((e >= num_epochs/2 && ((losses[0] > losses[1] && losses[0] > losses[2]))) || isnan(losses[0]))
-        if ((losses[0] > losses[1] && losses[0] > losses[2]+(losses[2]-losses[1])) || isnan(losses[0]))
+        if ((losses[0] > losses[1] && losses[0] > losses[2]) || isnan(losses[0]))
         {
           quit = true;
           load(filename1);
@@ -717,7 +725,7 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
         losses[2] = M2.loss(X_valid, y_valid);
 
         //if ((e >= num_epochs/2 && ((losses[0] > losses[1] && losses[0] > losses[2]))) || isnan(losses[0]))
-        if ((losses[0] > losses[1] && losses[0] > losses[2]+(losses[2]-losses[1])) || isnan(losses[0]))
+        if ((losses[0] > losses[1] && losses[0] > losses[2]) || isnan(losses[0]))
         {
           quit = true;
           load(filename1);
