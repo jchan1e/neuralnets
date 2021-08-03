@@ -632,11 +632,19 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
 void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<float*> X_valid, vector<float*> y_valid, int num_epochs, float alpha, float decay)
 {
   int pid = getpid();
-  int interval = 10;
+  int interval = 1;
+  if (num_epochs >= 20)
+    interval = 2;
+  if (num_epochs >= 50)
+    interval = 5;
+  if (num_epochs >= 100)
+    interval = 10;
   if (num_epochs >= 200)
     interval = 20;
-  if (num_epochs >= 1000)
+  if (num_epochs >= 500)
     interval = 50;
+  if (num_epochs >= 1000)
+    interval = 100;
 
   float loss_t = loss(X_train, y_train);
   float loss_v = loss(X_valid, y_valid);
