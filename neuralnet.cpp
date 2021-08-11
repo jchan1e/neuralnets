@@ -622,7 +622,10 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, int num_ep
         if ((losses[0] > losses[1] && losses[0] > losses[2]) || isnan(losses[0]))
         {
           quit = true;
-          load(filename1);
+          if (losses[2] < losses[1])
+            load(filename2);
+          else
+            load(filename1);
         }
       }
     }
@@ -736,7 +739,10 @@ void Neuralnet::train(vector<float*> X_train, vector<float*> y_train, vector<flo
         if ((losses[0] > losses[1] && losses[0] > losses[2]) || isnan(losses[0]))
         {
           quit = true;
-          load(filename1);
+          if (losses[2] < losses[1])
+            load(filename2);
+          else
+            load(filename1);
         }
       }
     }
